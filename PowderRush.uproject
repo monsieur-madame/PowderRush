@@ -1,0 +1,36 @@
+{
+	"FileVersion": 3,
+	"EngineAssociation": "5.7",
+	"Category": "Games",
+	"Description": "Arcade skiing/snowboarding mobile game with carving mechanics and endless run gameplay.",
+	"Modules": [
+		{
+			"Name": "PowderRush",
+			"Type": "Runtime",
+			"LoadingPhase": "Default"
+		}
+	],
+	"Plugins": [
+		{
+			"Name": "EnhancedInput",
+			"Enabled": true
+		},
+		{
+			"Name": "Niagara",
+			"Enabled": true
+		},
+		{
+			"Name": "CommonUI",
+			"Enabled": true
+		},
+		{
+			"Name": "MetasoundEngine",
+			"Enabled": true
+		}
+	],
+	"TargetPlatforms": [
+		"IOS",
+		"Android",
+		"Mac"
+	]
+}

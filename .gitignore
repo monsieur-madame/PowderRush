@@ -1,0 +1,51 @@
+# UE5 Build artifacts
+Binaries/
+DerivedDataCache/
+Intermediate/
+Saved/
+Build/
+
+# Visual Studio
+.vs/
+*.sln
+*.suo
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# Xcode
+*.xcworkspace
+*.xcodeproj
+
+# JetBrains Rider
+.idea/
+
+# macOS
+.DS_Store
+*.swp
+*~
+
+# UE5 generated
+*.VC.db
+*.opensdf
+*.opendb
+*.sdf
+*.ipch
+*.pdb
+*.pch
+
+# Compiled assets (Content is version controlled, but cooked is not)
+Saved/Cooked/
+Saved/StagedBuilds/
+Saved/Logs/
+Saved/Config/CrashReportClient/
+
+# Ignore Content that's too large for git (use Git LFS for these)
+# *.uasset  # Uncomment if NOT using Git LFS
+# *.umap    # Uncomment if NOT using Git LFS
+
+# Package files
+*.pak
+
+# Thumbnails
+__Thumbs.db
