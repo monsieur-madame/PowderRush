@@ -1,11 +1,11 @@
 #pragma once
 #include "CoreMinimal.h"
-#include "GameFramework/MovementComponent.h"
+#include "GameFramework/PawnMovementComponent.h"
 #include "Core/PowderTypes.h"
 #include "PowderMovementComponent.generated.h"
 
 UCLASS(ClassGroup=(PowderRush), meta=(BlueprintSpawnableComponent))
-class POWDERRUSH_API UPowderMovementComponent : public UMovementComponent
+class POWDERRUSH_API UPowderMovementComponent : public UPawnMovementComponent
 {
 	GENERATED_BODY()
 
@@ -44,9 +44,6 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
 	bool IsBoosting() const { return bIsBoosting; }
-
-	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
-	FVector GetVelocity() const { return Velocity; }
 
 	// --- Events ---
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnBoostActivated);
@@ -109,9 +106,6 @@ protected:
 	void UpdateBoost(float DeltaTime);
 	void ApplyMovement(float DeltaTime);
 
-	UPROPERTY()
-	FVector Velocity;
-
 	float CarveInput = 0.0f;
 	float CurrentCarveAngle = 0.0f;
 	float CurrentSpeed = 0.0f;
@@ -120,4 +114,6 @@ protected:
 	float BoostTimer = 0.0f;
 	FVector SlopeNormal = FVector::UpVector;
 	FVector SlopeForward = FVector::ForwardVector;
+	float DesiredYaw = 0.0f;
+	bool bOnGround = false;
 };

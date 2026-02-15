@@ -30,7 +30,11 @@ void APowderPlayerController::BeginPlay()
 void APowderPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
-	// Enhanced Input bindings can be configured here or in Blueprint
+
+	// Bind touch events via input component
+	InputComponent->BindTouch(IE_Pressed, this, &APowderPlayerController::HandleTouchBegin);
+	InputComponent->BindTouch(IE_Released, this, &APowderPlayerController::HandleTouchEnd);
+	InputComponent->BindTouch(IE_Repeat, this, &APowderPlayerController::HandleTouchMove);
 }
 
 void APowderPlayerController::Tick(float DeltaTime)
@@ -69,42 +73,30 @@ void APowderPlayerController::Tick(float DeltaTime)
 	}
 }
 
-bool APowderPlayerController::InputTouch(uint32 Handle, ETouchType::Type Type,
-	const FVector2D& TouchLocation, float Force, FDateTime DeviceTimestamp, uint32 TouchpadIndex)
+void APowderPlayerController::HandleTouchBegin(ETouchIndex::Type FingerIndex, FVector Location)
+{
+	bTouchActive = true;
+	TouchHoldDuration = 0.0f;
+	ProcessTouchLocation(Location);
+}
+
+void APowderPlayerController::HandleTouchEnd(ETouchIndex::Type FingerIndex, FVector Location)
+{
+	bTouchActive = false;
+	TouchHoldDuration = 0.0f;
+}
+
+void APowderPlayerController::HandleTouchMove(ETouchIndex::Type FingerIndex, FVector Location)
+{
+	ProcessTouchLocation(Location);
+}
+
+void APowderPlayerController::ProcessTouchLocation(const FVector& Location)
 {
 	int32 ViewportSizeX, ViewportSizeY;
 	GetViewportSize(ViewportSizeX, ViewportSizeY);
 
 	float ScreenMidX = ViewportSizeX * 0.5f;
-
-	switch (Type)
-	{
-	case ETouchType::Began:
-		bTouchActive = true;
-		TouchHoldDuration = 0.0f;
-		// Left half = carve left (-1), Right half = carve right (+1)
-		TouchCarveInput = (TouchLocation.X < ScreenMidX) ? -1.0f : 1.0f;
-		break;
-
-	case ETouchType::Moved:
-		// Update side if finger crosses midpoint
-		TouchCarveInput = (TouchLocation.X < ScreenMidX) ? -1.0f : 1.0f;
-		break;
-
-	case ETouchType::Ended:
-	case ETouchType::ForceChanged:
-		bTouchActive = false;
-		TouchHoldDuration = 0.0f;
-		break;
-
-	default:
-		break;
-	}
-
-	return true;
-}
-
-void APowderPlayerController::UpdateCarveFromTouch()
-{
-	// Handled in Tick for smooth interpolation
+	// Left half = carve left (-1), Right half = carve right (+1)
+	TouchCarveInput = (Location.X < ScreenMidX) ? -1.0f : 1.0f;
 }

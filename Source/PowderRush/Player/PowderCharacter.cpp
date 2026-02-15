@@ -1,7 +1,7 @@
 #include "Player/PowderCharacter.h"
 #include "Player/PowderMovementComponent.h"
 #include "Components/CapsuleComponent.h"
-#include "Components/SkeletalMeshComponent.h"
+#include "Components/StaticMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 
@@ -15,10 +15,31 @@ APowderCharacter::APowderCharacter()
 	CapsuleComp->SetCollisionProfileName(TEXT("Pawn"));
 	SetRootComponent(CapsuleComp);
 
-	// Skeletal mesh for character model
-	MeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Mesh"));
+	// Body mesh (cylinder placeholder)
+	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	MeshComp->SetupAttachment(CapsuleComp);
 	MeshComp->SetRelativeLocation(FVector(0.0f, 0.0f, -90.0f));
+	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MeshComp->SetRelativeScale3D(FVector(0.4f, 0.4f, 0.9f));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyMeshAsset(
+		TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
+	if (BodyMeshAsset.Succeeded())
+	{
+		MeshComp->SetStaticMesh(BodyMeshAsset.Object);
+	}
+
+	// Head mesh (sphere placeholder)
+	HeadMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HeadMesh"));
+	HeadMesh->SetupAttachment(MeshComp);
+	HeadMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 55.0f));
+	HeadMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	HeadMesh->SetRelativeScale3D(FVector(0.3f, 0.3f, 0.3f));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> HeadMeshAsset(
+		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (HeadMeshAsset.Succeeded())
+	{
+		HeadMesh->SetStaticMesh(HeadMeshAsset.Object);
+	}
 
 	// Spring arm for camera
 	SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
@@ -81,5 +102,5 @@ void APowderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 
 UPawnMovementComponent* APowderCharacter::GetMovementComponent() const
 {
-	return MovementComp;
+	return MovementComp.Get();
 }

@@ -6,7 +6,7 @@
 
 class UPowderMovementComponent;
 class UCapsuleComponent;
-class USkeletalMeshComponent;
+class UStaticMeshComponent;
 class USpringArmComponent;
 class UCameraComponent;
 
@@ -35,7 +35,10 @@ protected:
 	TObjectPtr<UCapsuleComponent> CapsuleComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<USkeletalMeshComponent> MeshComp;
+	TObjectPtr<UStaticMeshComponent> MeshComp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
+	TObjectPtr<UStaticMeshComponent> HeadMesh;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
 	TObjectPtr<USpringArmComponent> SpringArmComp;

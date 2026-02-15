@@ -17,11 +17,17 @@ ACoinPickup::ACoinPickup()
 	CollectionSphere->SetGenerateOverlapEvents(true);
 	SetRootComponent(CollectionSphere);
 
-	// Coin mesh
+	// Coin mesh (flattened sphere = disc shape)
 	CoinMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("CoinMesh"));
 	CoinMesh->SetupAttachment(CollectionSphere);
 	CoinMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	CoinMesh->SetRelativeScale3D(FVector(0.5f));
+	CoinMesh->SetRelativeScale3D(FVector(0.5f, 0.15f, 0.5f));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> CoinMeshAsset(
+		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (CoinMeshAsset.Succeeded())
+	{
+		CoinMesh->SetStaticMesh(CoinMeshAsset.Object);
+	}
 
 	// Sparkle effect attachment point
 	SparkleEffect = CreateDefaultSubobject<UNiagaraComponent>(TEXT("SparkleEffect"));

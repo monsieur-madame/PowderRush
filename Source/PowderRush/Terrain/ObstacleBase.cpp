@@ -13,6 +13,12 @@ AObstacleBase::AObstacleBase()
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	SetRootComponent(MeshComp);
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> SphereMesh(
+		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	if (SphereMesh.Succeeded())
+	{
+		MeshComp->SetStaticMesh(SphereMesh.Object);
+	}
 
 	// Inner collision sphere
 	CollisionComp = CreateDefaultSubobject<USphereComponent>(TEXT("Collision"));

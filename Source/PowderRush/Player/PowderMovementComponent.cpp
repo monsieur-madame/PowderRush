@@ -64,8 +64,10 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 		return;
 	}
 
-	FVector Start = UpdatedComponent->GetComponentLocation();
-	FVector End = Start - FVector::UpVector * TerrainTraceDistance;
+	FVector CurrentLocation = UpdatedComponent->GetComponentLocation();
+	// Start trace from well above the character to avoid starting inside geometry
+	FVector Start = CurrentLocation + FVector::UpVector * 200.0f;
+	FVector End = Start - FVector::UpVector * (200.0f + TerrainTraceDistance);
 
 	FHitResult Hit;
 	FCollisionQueryParams QueryParams;
@@ -73,20 +75,35 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 
 	if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, QueryParams))
 	{
+		bOnGround = true;
 		SlopeNormal = Hit.ImpactNormal;
 
-		// Project forward direction onto slope plane
-		FVector WorldForward = -FVector::ForwardVector; // Downhill is -X in our setup
-		SlopeForward = FVector::VectorPlaneProject(WorldForward, SlopeNormal).GetSafeNormal();
+		// Derive downhill direction from gravity projected onto slope — works for any slope orientation
+		FVector Gravity = FVector(0.0f, 0.0f, -1.0f);
+		FVector Downhill = FVector::VectorPlaneProject(Gravity, SlopeNormal).GetSafeNormal();
+		if (!Downhill.IsNearlyZero())
+		{
+			SlopeForward = Downhill;
+		}
 
-		// Snap to terrain surface (keep small offset above ground)
-		float DesiredHeight = Hit.ImpactPoint.Z + 90.0f; // Capsule half-height offset
-		FVector CurrentLocation = UpdatedComponent->GetComponentLocation();
+		// Immediate snap to terrain surface (capsule half-height offset)
+		float DesiredHeight = Hit.ImpactPoint.Z + 90.0f;
 		float HeightDelta = DesiredHeight - CurrentLocation.Z;
-		float SnapSpeed = 10.0f;
-
-		FVector HeightAdjust = FVector(0.0f, 0.0f, HeightDelta * FMath::Min(SnapSpeed * DeltaTime, 1.0f));
+		FVector HeightAdjust = FVector(0.0f, 0.0f, HeightDelta);
 		UpdatedComponent->MoveComponent(HeightAdjust, UpdatedComponent->GetComponentRotation(), true);
+
+		// Initialize heading from slope on first ground contact
+		if (DesiredYaw == 0.0f && !SlopeForward.IsNearlyZero())
+		{
+			DesiredYaw = SlopeForward.Rotation().Yaw;
+		}
+	}
+	else
+	{
+		// No terrain hit — apply gravity so the character settles onto terrain
+		bOnGround = false;
+		FVector GravityDrop = FVector(0.0f, 0.0f, -GravityAcceleration * DeltaTime);
+		UpdatedComponent->MoveComponent(GravityDrop, UpdatedComponent->GetComponentRotation(), true);
 	}
 }
 
@@ -177,14 +194,17 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 	FVector TotalMovement = ForwardMovement + LateralMovement;
 	Velocity = TotalMovement / DeltaTime;
 
-	// Rotate character to face movement direction
+	// Rotate capsule to face movement direction — Yaw only, no Pitch/Roll
+	// Visual tilt is handled by the spring arm camera in PowderCharacter::Tick
 	FRotator DesiredRotation = UpdatedComponent->GetComponentRotation();
-	if (!TotalMovement.IsNearlyZero())
+	DesiredRotation.Pitch = 0.0f;
+	DesiredRotation.Roll = 0.0f;
+	if (!SlopeForward.IsNearlyZero())
 	{
-		FRotator MoveRotation = TotalMovement.Rotation();
-		DesiredRotation.Yaw = MoveRotation.Yaw;
-		// Add visual roll from carving
-		DesiredRotation.Roll = -CurrentCarveAngle * 0.3f;
+		// Stable yaw: rotate SlopeForward by carve angle around Up axis
+		FVector CarvedDirection = SlopeForward.RotateAngleAxis(CurrentCarveAngle, FVector::UpVector);
+		DesiredYaw = CarvedDirection.Rotation().Yaw;
+		DesiredRotation.Yaw = DesiredYaw;
 	}
 
 	FHitResult Hit;

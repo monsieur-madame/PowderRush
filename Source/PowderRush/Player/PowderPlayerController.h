@@ -20,9 +20,6 @@ public:
 	virtual void SetupInputComponent() override;
 	virtual void Tick(float DeltaTime) override;
 
-	// Touch input handling
-	virtual bool InputTouch(uint32 Handle, ETouchType::Type Type, const FVector2D& TouchLocation, float Force, FDateTime DeviceTimestamp, uint32 TouchpadIndex) override;
-
 protected:
 	// Enhanced Input Assets (set in Blueprint)
 	UPROPERTY(EditDefaultsOnly, BlueprintReadOnly, Category = "PowderRush|Input")
@@ -42,5 +39,9 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UPowderMovementComponent> CachedMovement;
 
-	void UpdateCarveFromTouch();
+	void HandleTouchBegin(ETouchIndex::Type FingerIndex, FVector Location);
+	void HandleTouchEnd(ETouchIndex::Type FingerIndex, FVector Location);
+	void HandleTouchMove(ETouchIndex::Type FingerIndex, FVector Location);
+
+	void ProcessTouchLocation(const FVector& Location);
 };
