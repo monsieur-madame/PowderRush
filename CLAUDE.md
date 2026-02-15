@@ -68,6 +68,9 @@ PowderRush/
 - **iOS**: Shipping builds for iPhone 12+ (Metal)
 - **Android**: Shipping builds for Galaxy S21+ (Vulkan) - Phase 6+
 
+### UE5 Documentation
+- Engine API docs: `/Users/toto/Documents/Epic Games/UE_5.7/Engine/Documentation/Source`
+
 ## Current Phase
 Phase 1: Prototype Core Feel - Make skiing feel amazing on a simple slope.
 

@@ -22,8 +22,7 @@ public class PowderRush : ModuleRules
 
         PrivateDependencyModuleNames.AddRange(new string[]
         {
-            "CommonUI",
-            "MetasoundEngine"
+            "CommonUI"
         });
     }
 }
