@@ -9,7 +9,7 @@ class UCapsuleComponent;
 class UStaticMeshComponent;
 class USpringArmComponent;
 class UCameraComponent;
-class UNiagaraComponent;
+class UPowderSnowSpray;
 
 UCLASS()
 class POWDERRUSH_API APowderCharacter : public APawn
@@ -51,35 +51,44 @@ protected:
 	TObjectPtr<UPowderMovementComponent> MovementComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UNiagaraComponent> SnowSprayComp;
+	TObjectPtr<UPowderSnowSpray> SnowSprayComp;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Character")
 	ERiderType RiderType = ERiderType::Snowboarder;
 
 	// --- Camera Tuning (Three-Quarter Diorama) ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float BaseArmLength = 900.0f;
+	float BaseArmLength = 1400.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float MaxArmLength = 1200.0f;
+	float MaxArmLength = 1800.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float BasePitch = -45.0f;
+	float BasePitch = -30.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float SpeedPitch = -35.0f;
+	float SpeedPitch = -22.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float BaseYawOffset = 30.0f;
+	float BaseYawOffset = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float CarveYawInfluence = 15.0f;
+	float CarveYawInfluence = -5.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float BaseFOV = 60.0f;
+	float BaseFOV = 72.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float MaxFOV = 70.0f;
+	float MaxFOV = 82.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float ArmLengthInterpSpeed = 8.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float RotationInterpSpeed = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float FOVInterpSpeed = 8.0f;
 
 	void UpdateDioramaCamera(float DeltaTime);
 	void UpdateSnowSpray();

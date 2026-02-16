@@ -24,6 +24,12 @@ void UPowderMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 		return;
 	}
 
+	if (bIsAirborne)
+	{
+		UpdateAirborne(DeltaTime);
+		return;
+	}
+
 	UpdateTerrainFollowing(DeltaTime);
 	UpdateCarving(DeltaTime);
 	UpdateSpeed(DeltaTime);
@@ -73,7 +79,8 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 	FCollisionQueryParams QueryParams;
 	QueryParams.AddIgnoredActor(GetOwner());
 
-	if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, QueryParams))
+	if (GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_WorldStatic, QueryParams)
+		&& Hit.ImpactNormal.Z > 0.5f)  // Only follow upward-facing surfaces — reject walls, edges, undersides
 	{
 		bOnGround = true;
 		SlopeNormal = Hit.ImpactNormal;
@@ -100,7 +107,7 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 	}
 	else
 	{
-		// No terrain hit — apply gravity so the character settles onto terrain
+		// No valid terrain hit — apply gravity so the character settles onto terrain
 		bOnGround = false;
 		FVector GravityDrop = FVector(0.0f, 0.0f, -GravityAcceleration * DeltaTime);
 		UpdatedComponent->MoveComponent(GravityDrop, UpdatedComponent->GetComponentRotation(), true);
@@ -131,6 +138,12 @@ void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 
 void UPowderMovementComponent::UpdateSpeed(float DeltaTime)
 {
+	if (WipeoutRecoveryTimer > 0.0f)
+	{
+		WipeoutRecoveryTimer -= DeltaTime;
+		return;
+	}
+
 	// Gravity-based acceleration along slope
 	float SlopeComponent = FMath::Sin(FMath::DegreesToRadians(SlopeAngle));
 	float GravityForce = GravityAcceleration * SlopeComponent;
@@ -214,14 +227,75 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 	{
 		// Slide along surfaces we hit
 		FVector SlideMovement = FVector::VectorPlaneProject(TotalMovement, Hit.ImpactNormal);
-		UpdatedComponent->MoveComponent(SlideMovement, DesiredRotation, true);
+		FHitResult SlideHit;
+		UpdatedComponent->MoveComponent(SlideMovement, DesiredRotation, true, &SlideHit);
+
+		if (SlideHit.IsValidBlockingHit())
+		{
+			// Both movement attempts blocked — push outward to prevent stuck state
+			FVector PushOut = Hit.ImpactNormal * 50.0f;
+			UpdatedComponent->MoveComponent(PushOut, DesiredRotation, true);
+		}
 
 		// If we hit something head-on at speed, trigger wipeout
 		float ImpactDot = FVector::DotProduct(TotalMovement.GetSafeNormal(), Hit.ImpactNormal);
 		if (ImpactDot < -0.7f && CurrentSpeed > MaxSpeed * 0.5f)
 		{
-			CurrentSpeed = 0.0f;
+			CurrentSpeed *= 0.1f;
+			WipeoutRecoveryTimer = 0.5f;
 			OnWipeout.Broadcast();
 		}
+	}
+
+}
+
+void UPowderMovementComponent::LaunchIntoAir(FVector AdditionalVelocity)
+{
+	if (bIsAirborne)
+	{
+		return;
+	}
+
+	bIsAirborne = true;
+	AirborneTimer = 0.0f;
+
+	// Combine current ground velocity with launch impulse
+	AirborneVelocity = Velocity + AdditionalVelocity;
+
+	OnLaunched.Broadcast();
+}
+
+void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
+{
+	if (!UpdatedComponent)
+	{
+		return;
+	}
+
+	AirborneTimer += DeltaTime;
+
+	// Apply gravity
+	AirborneVelocity.Z -= GravityAcceleration * DeltaTime;
+
+	FVector Movement = AirborneVelocity * DeltaTime;
+	FRotator CurrentRotation = UpdatedComponent->GetComponentRotation();
+
+	FHitResult Hit;
+	UpdatedComponent->MoveComponent(Movement, CurrentRotation, true, &Hit);
+
+	// Check for landing: blocking hit with upward-facing surface
+	if (Hit.IsValidBlockingHit() && Hit.ImpactNormal.Z > 0.5f)
+	{
+		bIsAirborne = false;
+
+		// Restore speed from horizontal component of airborne velocity
+		FVector HorizontalVel(AirborneVelocity.X, AirborneVelocity.Y, 0.0f);
+		CurrentSpeed = FMath::Clamp(HorizontalVel.Size(), 0.0f, MaxSpeed);
+		AirborneVelocity = FVector::ZeroVector;
+
+		float AirTime = AirborneTimer;
+		AirborneTimer = 0.0f;
+
+		OnLanded.Broadcast(AirTime);
 	}
 }

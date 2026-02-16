@@ -15,13 +15,20 @@ APowderSlopeTile::APowderSlopeTile()
 		SlopeMesh->SetStaticMesh(CubeMesh.Object);
 	}
 
-	// Scale: Cube is 100x100x100 base. (100,50,1) => 10000x5000x100 units
-	SlopeMesh->SetRelativeScale3D(FVector(SlopeLength / 100.0f, SlopeWidth / 100.0f, 1.0f));
-
-	// Pitch the slab downhill
-	SlopeMesh->SetRelativeRotation(FRotator(-SlopeAngleDegrees, 0.0f, 0.0f));
-
 	// Collision for physics and line traces
 	SlopeMesh->SetCollisionProfileName(TEXT("BlockAll"));
 	SlopeMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+}
+
+void APowderSlopeTile::OnConstruction(const FTransform& Transform)
+{
+	Super::OnConstruction(Transform);
+
+	// Re-apply scale and rotation from current property values
+	// Cube is 100x100x100 base units
+	if (SlopeMesh)
+	{
+		SlopeMesh->SetRelativeScale3D(FVector(SlopeLength / 100.0f, SlopeWidth / 100.0f, 1.0f));
+		SlopeMesh->SetRelativeRotation(FRotator(-SlopeAngleDegrees, 0.0f, 0.0f));
+	}
 }

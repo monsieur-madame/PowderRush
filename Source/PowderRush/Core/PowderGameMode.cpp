@@ -1,19 +1,25 @@
 // Copyright PowderRush. All Rights Reserved.
 
 #include "Core/PowderGameMode.h"
+#include "Core/PowderEnvironmentSetup.h"
 #include "Player/PowderCharacter.h"
 #include "Player/PowderPlayerController.h"
+#include "UI/PowderHUD.h"
 
 APowderGameMode::APowderGameMode()
 {
 	DefaultPawnClass = APowderCharacter::StaticClass();
 	PlayerControllerClass = APowderPlayerController::StaticClass();
+	HUDClass = APowderHUD::StaticClass();
 	RunState = EPowderRunState::InMenu;
 }
 
 void APowderGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Spawn environment (lighting, sky, fog, trees, rocks, slope material)
+	EnvironmentSetup = GetWorld()->SpawnActor<APowderEnvironmentSetup>();
 
 	// Auto-start run for prototyping — skip menu flow
 	StartRun();
@@ -23,7 +29,22 @@ void APowderGameMode::StartRun()
 {
 	SetRunState(EPowderRunState::Starting);
 
-	// TODO: Reset terrain, score, position
+	// Move player to the top of the slope
+	if (EnvironmentSetup)
+	{
+		APawn* PlayerPawn = GetWorld()->GetFirstPlayerController()->GetPawn();
+		if (PlayerPawn)
+		{
+			FVector StartPos = EnvironmentSetup->GetSlopeStartPosition();
+			// Nudge slightly downhill so the player is on the slope, not at the very edge
+			StartPos += EnvironmentSetup->GetSlopeDownhill() * 200.0f;
+			// Lift above surface so the pawn doesn't clip into the slab
+			StartPos.Z += 100.0f;
+
+			FRotator StartRot = EnvironmentSetup->GetSlopeDownhill().Rotation();
+			PlayerPawn->SetActorLocationAndRotation(StartPos, StartRot);
+		}
+	}
 
 	SetRunState(EPowderRunState::Running);
 }

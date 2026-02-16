@@ -4,7 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
-#include "NiagaraComponent.h"
+#include "Effects/PowderSnowSpray.h"
 
 APowderCharacter::APowderCharacter()
 {
@@ -48,10 +48,8 @@ APowderCharacter::APowderCharacter()
 	SpringArmComp->TargetArmLength = 900.0f;
 	SpringArmComp->SetRelativeRotation(FRotator(-45.0f, 30.0f, 0.0f));
 	SpringArmComp->bUsePawnControlRotation = false;
-	SpringArmComp->bEnableCameraLag = true;
-	SpringArmComp->CameraLagSpeed = 3.0f;
-	SpringArmComp->bEnableCameraRotationLag = true;
-	SpringArmComp->CameraRotationLagSpeed = 3.0f;
+	SpringArmComp->bEnableCameraLag = false;
+	SpringArmComp->bEnableCameraRotationLag = false;
 	SpringArmComp->bDoCollisionTest = false;
 
 	// Camera
@@ -59,11 +57,10 @@ APowderCharacter::APowderCharacter()
 	CameraComp->SetupAttachment(SpringArmComp);
 	CameraComp->FieldOfView = 60.0f;
 
-	// Snow spray particle (Niagara system set in Blueprint)
-	SnowSprayComp = CreateDefaultSubobject<UNiagaraComponent>(TEXT("SnowSpray"));
+	// Snow spray (mesh-based particle system)
+	SnowSprayComp = CreateDefaultSubobject<UPowderSnowSpray>(TEXT("SnowSpray"));
 	SnowSprayComp->SetupAttachment(CapsuleComp);
 	SnowSprayComp->SetRelativeLocation(FVector(0.0f, 0.0f, -80.0f));
-	SnowSprayComp->SetAutoActivate(false);
 
 	// Custom movement
 	MovementComp = CreateDefaultSubobject<UPowderMovementComponent>(TEXT("PowderMovement"));
@@ -95,7 +92,7 @@ void APowderCharacter::UpdateDioramaCamera(float DeltaTime)
 	// Arm length: pulls back at speed (900 at rest, 1200 at max speed)
 	float TargetArmLength = FMath::Lerp(BaseArmLength, MaxArmLength, SpeedNorm);
 	SpringArmComp->TargetArmLength = FMath::FInterpTo(
-		SpringArmComp->TargetArmLength, TargetArmLength, DeltaTime, 2.0f);
+		SpringArmComp->TargetArmLength, TargetArmLength, DeltaTime, ArmLengthInterpSpeed);
 
 	// Pitch: lowers at speed to reveal more terrain ahead (-45 at rest, -35 at max)
 	float TargetPitch = FMath::Lerp(BasePitch, SpeedPitch, SpeedNorm);
@@ -108,12 +105,12 @@ void APowderCharacter::UpdateDioramaCamera(float DeltaTime)
 	FRotator CurrentRot = SpringArmComp->GetRelativeRotation();
 	FRotator TargetRot(TargetPitch, TargetYaw, 0.0f);
 	SpringArmComp->SetRelativeRotation(
-		FMath::RInterpTo(CurrentRot, TargetRot, DeltaTime, 3.0f));
+		FMath::RInterpTo(CurrentRot, TargetRot, DeltaTime, RotationInterpSpeed));
 
 	// FOV: subtle widen at speed (60 at rest, 70 at max)
 	float TargetFOV = FMath::Lerp(BaseFOV, MaxFOV, SpeedNorm);
 	CameraComp->FieldOfView = FMath::FInterpTo(
-		CameraComp->FieldOfView, TargetFOV, DeltaTime, 3.0f);
+		CameraComp->FieldOfView, TargetFOV, DeltaTime, FOVInterpSpeed);
 }
 
 void APowderCharacter::UpdateSnowSpray()
@@ -126,21 +123,14 @@ void APowderCharacter::UpdateSnowSpray()
 	bool bShouldSpray = MovementComp->IsCarving() &&
 		MovementComp->GetCurrentSpeed() > MovementComp->MaxSpeed * 0.15f;
 
-	if (bShouldSpray && !SnowSprayComp->IsActive())
-	{
-		SnowSprayComp->Activate();
-	}
-	else if (!bShouldSpray && SnowSprayComp->IsActive())
-	{
-		SnowSprayComp->Deactivate();
-	}
-
-	// Orient spray opposite to carve direction
 	if (bShouldSpray)
 	{
 		float CarveAngle = MovementComp->GetCarveAngle();
-		float SprayYaw = (CarveAngle > 0.0f) ? -90.0f : 90.0f;
-		SnowSprayComp->SetRelativeRotation(FRotator(0.0f, SprayYaw, 0.0f));
+		SnowSprayComp->ActivateSpray(CarveAngle);
+	}
+	else if (!bShouldSpray && SnowSprayComp->IsSprayActive())
+	{
+		SnowSprayComp->DeactivateSpray();
 	}
 }
 

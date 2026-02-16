@@ -45,6 +45,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
 	bool IsBoosting() const { return bIsBoosting; }
 
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
+	bool IsAirborne() const { return bIsAirborne; }
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
+	void LaunchIntoAir(FVector AdditionalVelocity);
+
 	// --- Events ---
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnBoostActivated);
 	UPROPERTY(BlueprintAssignable, Category = "PowderRush|Movement")
@@ -53,6 +59,14 @@ public:
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnWipeout);
 	UPROPERTY(BlueprintAssignable, Category = "PowderRush|Movement")
 	FOnWipeout OnWipeout;
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLaunched);
+	UPROPERTY(BlueprintAssignable, Category = "PowderRush|Movement")
+	FOnLaunched OnLaunched;
+
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLanded, float, AirTime);
+	UPROPERTY(BlueprintAssignable, Category = "PowderRush|Movement")
+	FOnLanded OnLanded;
 
 	// --- Tuning Parameters (exposed to Blueprints for iteration) ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
@@ -105,6 +119,7 @@ protected:
 	void UpdateSpeed(float DeltaTime);
 	void UpdateBoost(float DeltaTime);
 	void ApplyMovement(float DeltaTime);
+	void UpdateAirborne(float DeltaTime);
 
 	float CarveInput = 0.0f;
 	float CurrentCarveAngle = 0.0f;
@@ -116,4 +131,12 @@ protected:
 	FVector SlopeForward = FVector::ForwardVector;
 	float DesiredYaw = 0.0f;
 	bool bOnGround = false;
+
+	// Wipeout recovery
+	float WipeoutRecoveryTimer = 0.0f;
+
+	// Airborne state
+	bool bIsAirborne = false;
+	FVector AirborneVelocity = FVector::ZeroVector;
+	float AirborneTimer = 0.0f;
 };

@@ -16,6 +16,8 @@ enum class EPowderRunState : uint8
 	ScoreScreen
 };
 
+class APowderEnvironmentSetup;
+
 UCLASS()
 class POWDERRUSH_API APowderGameMode : public AGameModeBase
 {
@@ -51,4 +53,7 @@ protected:
 	EPowderRunState RunState;
 
 	void SetRunState(EPowderRunState NewState);
+
+	UPROPERTY()
+	TObjectPtr<APowderEnvironmentSetup> EnvironmentSetup;
 };

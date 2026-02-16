@@ -12,6 +12,14 @@ class POWDERRUSH_API APowderSlopeTile : public AActor
 
 public:
 	APowderSlopeTile();
+	virtual void OnConstruction(const FTransform& Transform) override;
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
+	UStaticMeshComponent* GetSlopeMesh() const { return SlopeMesh; }
+
+	float GetSlopeAngle() const { return SlopeAngleDegrees; }
+	float GetSlopeLength() const { return SlopeLength; }
+	float GetSlopeWidth() const { return SlopeWidth; }
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Terrain")
