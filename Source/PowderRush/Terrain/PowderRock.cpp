@@ -1,6 +1,9 @@
 #include "Terrain/PowderRock.h"
 #include "Components/StaticMeshComponent.h"
 #include "Effects/PowderMaterialHelper.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 APowderRock::APowderRock()
 {
@@ -8,7 +11,9 @@ APowderRock::APowderRock()
 
 	RockMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("RockMesh"));
 	SetRootComponent(RockMesh);
-	RockMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	RockMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	RockMesh->SetCollisionObjectType(ECC_WorldStatic);
+	RockMesh->SetCollisionResponseToAllChannels(ECR_Block);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CubeAsset(
 		TEXT("/Engine/BasicShapes/Cube.Cube"));

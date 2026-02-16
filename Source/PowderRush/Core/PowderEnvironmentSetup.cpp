@@ -3,7 +3,9 @@
 #include "Terrain/PowderTree.h"
 #include "Terrain/PowderRock.h"
 #include "Terrain/PowderJump.h"
+#include "Terrain/PowderFinishLine.h"
 #include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/SkyLightComponent.h"
@@ -56,6 +58,7 @@ void APowderEnvironmentSetup::BeginPlay()
 	SpawnBorderRocks(RNG);
 	SpawnCourseRocks(RNG);
 	SpawnJumps(RNG);
+	SpawnFinishLine();
 	ApplySlopeMaterial();
 }
 
@@ -379,6 +382,26 @@ void APowderEnvironmentSetup::SpawnJumps(FRandomStream& RNG)
 		{
 			PlacedObstacleLocations.Add(Location);
 		}
+	}
+}
+
+void APowderEnvironmentSetup::SpawnFinishLine()
+{
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	FVector Location = SlopePositionToWorld(FinishLinePosition, 0.0f);
+	FRotator Rotation = SlopeDownhill.Rotation();
+
+	FActorSpawnParameters Params;
+	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	APowderFinishLine* FinishLine = World->SpawnActor<APowderFinishLine>(Location, Rotation, Params);
+	if (FinishLine)
+	{
+		FinishLine->InitExtent(SlopeWidth);
 	}
 }
 

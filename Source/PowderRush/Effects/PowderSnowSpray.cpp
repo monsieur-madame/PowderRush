@@ -1,6 +1,8 @@
 #include "Effects/PowderSnowSpray.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 UPowderSnowSpray::UPowderSnowSpray()
 {

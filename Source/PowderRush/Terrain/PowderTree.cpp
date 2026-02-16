@@ -2,6 +2,9 @@
 #include "Components/StaticMeshComponent.h"
 #include "Components/SceneComponent.h"
 #include "Effects/PowderMaterialHelper.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
 
 APowderTree::APowderTree()
 {
@@ -14,7 +17,9 @@ APowderTree::APowderTree()
 	// Trunk: cylinder
 	TrunkMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Trunk"));
 	TrunkMesh->SetupAttachment(Root);
-	TrunkMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	TrunkMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	TrunkMesh->SetCollisionObjectType(ECC_WorldStatic);
+	TrunkMesh->SetCollisionResponseToAllChannels(ECR_Block);
 
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> CylinderAsset(
 		TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));

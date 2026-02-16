@@ -1,6 +1,9 @@
 #include "Player/PowderPlayerController.h"
 #include "Player/PowderCharacter.h"
 #include "Player/PowderMovementComponent.h"
+#include "Core/PowderGameMode.h"
+#include "Engine/World.h"
+#include "Engine/LocalPlayer.h"
 #include "EnhancedInputComponent.h"
 #include "EnhancedInputSubsystems.h"
 
@@ -45,6 +48,9 @@ void APowderPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Left, IE_Released, this, &APowderPlayerController::HandleKeyCarveLeftReleased);
 	InputComponent->BindKey(EKeys::Right, IE_Pressed, this, &APowderPlayerController::HandleKeyCarveRightPressed);
 	InputComponent->BindKey(EKeys::Right, IE_Released, this, &APowderPlayerController::HandleKeyCarveRightReleased);
+
+	// Restart key for desktop testing
+	InputComponent->BindKey(EKeys::R, IE_Pressed, this, &APowderPlayerController::HandleRestart);
 }
 
 void APowderPlayerController::Tick(float DeltaTime)
@@ -63,13 +69,13 @@ void APowderPlayerController::Tick(float DeltaTime)
 	if (bTouchActive)
 	{
 		TouchHoldDuration += DeltaTime;
-		float Intensity = FMath::Clamp(TouchHoldDuration / 0.5f, 0.3f, 1.0f);
+		float Intensity = FMath::Clamp(TouchHoldDuration / 0.25f, 0.6f, 1.0f);
 		Movement->SetCarveInput(TouchCarveInput * Intensity);
 	}
 	else if (bKeyboardCarveLeft || bKeyboardCarveRight)
 	{
 		KeyboardHoldDuration += DeltaTime;
-		float Intensity = FMath::Clamp(KeyboardHoldDuration / 0.5f, 0.3f, 1.0f);
+		float Intensity = FMath::Clamp(KeyboardHoldDuration / 0.25f, 0.6f, 1.0f);
 		float Direction = 0.0f;
 		if (bKeyboardCarveLeft) Direction -= 1.0f;
 		if (bKeyboardCarveRight) Direction += 1.0f;
@@ -101,8 +107,29 @@ UPowderMovementComponent* APowderPlayerController::GetMovementComp()
 	return CachedMovement.Get();
 }
 
+void APowderPlayerController::HandleRestart()
+{
+	if (APowderGameMode* GM = Cast<APowderGameMode>(GetWorld()->GetAuthGameMode()))
+	{
+		if (GM->GetRunState() == EPowderRunState::ScoreScreen)
+		{
+			GM->RestartRun();
+		}
+	}
+}
+
 void APowderPlayerController::HandleTouchBegin(ETouchIndex::Type FingerIndex, FVector Location)
 {
+	// During score screen, any tap restarts the run
+	if (APowderGameMode* GM = Cast<APowderGameMode>(GetWorld()->GetAuthGameMode()))
+	{
+		if (GM->GetRunState() == EPowderRunState::ScoreScreen)
+		{
+			GM->RestartRun();
+			return;
+		}
+	}
+
 	bTouchActive = true;
 	TouchHoldDuration = 0.0f;
 	ProcessTouchLocation(Location);

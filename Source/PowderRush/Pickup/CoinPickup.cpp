@@ -1,10 +1,13 @@
 #include "Pickup/CoinPickup.h"
 #include "Components/SphereComponent.h"
 #include "Components/StaticMeshComponent.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Engine/StaticMesh.h"
 #include "NiagaraComponent.h"
 #include "Player/PowderCharacter.h"
 #include "Scoring/ScoreSubsystem.h"
 #include "Core/PowderGameInstance.h"
+#include "Engine/GameInstance.h"
 
 ACoinPickup::ACoinPickup()
 {

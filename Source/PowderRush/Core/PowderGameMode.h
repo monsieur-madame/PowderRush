@@ -40,6 +40,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Game")
 	void RestartRun();
 
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Game")
+	void OnFinishLineCrossed();
+
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Game")
 	EPowderRunState GetRunState() const { return RunState; }
 

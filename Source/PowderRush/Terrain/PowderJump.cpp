@@ -4,6 +4,10 @@
 #include "Components/BoxComponent.h"
 #include "Effects/PowderMaterialHelper.h"
 #include "Player/PowderMovementComponent.h"
+#include "UObject/ConstructorHelpers.h"
+#include "Engine/StaticMesh.h"
+#include "Materials/MaterialInstanceDynamic.h"
+#include "Engine/World.h"
 
 APowderJump::APowderJump()
 {

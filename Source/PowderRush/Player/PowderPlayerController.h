@@ -2,6 +2,7 @@
 #include "CoreMinimal.h"
 #include "GameFramework/PlayerController.h"
 #include "InputActionValue.h"
+#include "Core/PowderGameMode.h"
 #include "PowderPlayerController.generated.h"
 
 class UInputAction;
@@ -57,4 +58,6 @@ protected:
 	void HandleKeyCarveRightReleased() { bKeyboardCarveRight = false; }
 
 	UPowderMovementComponent* GetMovementComp();
+
+	void HandleRestart();
 };

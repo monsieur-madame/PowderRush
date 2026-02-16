@@ -1,5 +1,6 @@
 #include "Player/PowderMovementComponent.h"
 #include "Components/PrimitiveComponent.h"
+#include "Engine/World.h"
 
 UPowderMovementComponent::UPowderMovementComponent()
 {
@@ -225,28 +226,32 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 
 	if (Hit.IsValidBlockingHit())
 	{
-		// Slide along surfaces we hit
-		FVector SlideMovement = FVector::VectorPlaneProject(TotalMovement, Hit.ImpactNormal);
-		FHitResult SlideHit;
-		UpdatedComponent->MoveComponent(SlideMovement, DesiredRotation, true, &SlideHit);
+		// Any obstacle hit = full stop and wipeout
+		CurrentSpeed = 0.0f;
+		WipeoutRecoveryTimer = 0.3f;
+		OnWipeout.Broadcast();
 
-		if (SlideHit.IsValidBlockingHit())
-		{
-			// Both movement attempts blocked — push outward to prevent stuck state
-			FVector PushOut = Hit.ImpactNormal * 50.0f;
-			UpdatedComponent->MoveComponent(PushOut, DesiredRotation, true);
-		}
-
-		// If we hit something head-on at speed, trigger wipeout
-		float ImpactDot = FVector::DotProduct(TotalMovement.GetSafeNormal(), Hit.ImpactNormal);
-		if (ImpactDot < -0.7f && CurrentSpeed > MaxSpeed * 0.5f)
-		{
-			CurrentSpeed *= 0.1f;
-			WipeoutRecoveryTimer = 0.5f;
-			OnWipeout.Broadcast();
-		}
+		// Push outward to prevent stuck inside geometry
+		FVector PushOut = Hit.ImpactNormal * 50.0f;
+		UpdatedComponent->MoveComponent(PushOut, DesiredRotation, true);
 	}
 
+}
+
+void UPowderMovementComponent::ResetMovementState()
+{
+	CurrentSpeed = 0.0f;
+	BoostMeter = 0.0f;
+	CurrentCarveAngle = 0.0f;
+	CarveInput = 0.0f;
+	bIsAirborne = false;
+	AirborneVelocity = FVector::ZeroVector;
+	AirborneTimer = 0.0f;
+	WipeoutRecoveryTimer = 0.0f;
+	bIsBoosting = false;
+	BoostTimer = 0.0f;
+	DesiredYaw = 0.0f;
+	Velocity = FVector::ZeroVector;
 }
 
 void UPowderMovementComponent::LaunchIntoAir(FVector AdditionalVelocity)

@@ -1,5 +1,6 @@
 #include "Terrain/TerrainManager.h"
 #include "Engine/LevelStreamingDynamic.h"
+#include "Engine/World.h"
 #include "Kismet/GameplayStatics.h"
 
 ATerrainManager::ATerrainManager()

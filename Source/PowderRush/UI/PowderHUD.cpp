@@ -1,6 +1,9 @@
 #include "UI/PowderHUD.h"
 #include "Player/PowderMovementComponent.h"
+#include "Core/PowderGameMode.h"
 #include "Engine/Canvas.h"
+#include "Engine/Engine.h"
+#include "Engine/World.h"
 
 void APowderHUD::DrawHUD()
 {
@@ -9,6 +12,32 @@ void APowderHUD::DrawHUD()
 	if (!Canvas)
 	{
 		return;
+	}
+
+	// Check if we're on the finish/score screen
+	if (APowderGameMode* GM = Cast<APowderGameMode>(GetWorld()->GetAuthGameMode()))
+	{
+		if (GM->GetRunState() == EPowderRunState::ScoreScreen)
+		{
+			// Draw centered "FINISHED!" text
+			float CenterX = Canvas->SizeX * 0.5f;
+			float CenterY = Canvas->SizeY * 0.4f;
+
+			// Dark overlay
+			DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.5f), 0.0f, 0.0f, Canvas->SizeX, Canvas->SizeY);
+
+			FString FinishedText = TEXT("FINISHED!");
+			float TextW, TextH;
+			GetTextSize(FinishedText, TextW, TextH, GEngine->GetLargeFont(), 1.0f);
+			DrawText(FinishedText, FColor::White, CenterX - TextW * 0.5f, CenterY - TextH * 0.5f, GEngine->GetLargeFont(), 1.0f);
+
+			FString RestartText = TEXT("Tap to restart");
+			float RestartW, RestartH;
+			GetTextSize(RestartText, RestartW, RestartH);
+			DrawText(RestartText, FColor(200, 200, 200), CenterX - RestartW * 0.5f, CenterY + TextH + 10.0f);
+
+			return;
+		}
 	}
 
 	APawn* Pawn = GetOwningPawn();

@@ -39,6 +39,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Environment")
 	int32 EnvironmentSeed = 42;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Environment")
+	float FinishLinePosition = 0.95f;
+
 private:
 	void SpawnLighting();
 	void SpawnSkyAndFog();
@@ -47,6 +50,7 @@ private:
 	void SpawnBorderRocks(FRandomStream& RNG);
 	void SpawnCourseRocks(FRandomStream& RNG);
 	void SpawnJumps(FRandomStream& RNG);
+	void SpawnFinishLine();
 	void ApplySlopeMaterial();
 
 	int32 ComputeCountFromDensity(float PerMillion) const;

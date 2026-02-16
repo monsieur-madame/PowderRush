@@ -51,6 +51,9 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
 	void LaunchIntoAir(FVector AdditionalVelocity);
 
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
+	void ResetMovementState();
+
 	// --- Events ---
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnBoostActivated);
 	UPROPERTY(BlueprintAssignable, Category = "PowderRush|Movement")
@@ -85,13 +88,13 @@ public:
 	float CarveSpeedBleed = 0.15f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveRate = 3.0f;
+	float CarveRate = 8.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float MaxCarveAngle = 60.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveLateralSpeed = 800.0f;
+	float CarveLateralSpeed = 1400.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float BoostFillRate = 0.3f;

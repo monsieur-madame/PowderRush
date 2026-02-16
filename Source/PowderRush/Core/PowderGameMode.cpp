@@ -3,8 +3,11 @@
 #include "Core/PowderGameMode.h"
 #include "Core/PowderEnvironmentSetup.h"
 #include "Player/PowderCharacter.h"
+#include "Player/PowderMovementComponent.h"
 #include "Player/PowderPlayerController.h"
 #include "UI/PowderHUD.h"
+#include "Engine/World.h"
+#include "TimerManager.h"
 
 APowderGameMode::APowderGameMode()
 {
@@ -65,7 +68,25 @@ void APowderGameMode::OnWipeout()
 
 void APowderGameMode::RestartRun()
 {
+	// Reset movement state before repositioning
+	APawn* PlayerPawn = GetWorld()->GetFirstPlayerController()->GetPawn();
+	if (PlayerPawn)
+	{
+		if (UPowderMovementComponent* MoveComp = PlayerPawn->FindComponentByClass<UPowderMovementComponent>())
+		{
+			MoveComp->ResetMovementState();
+		}
+	}
+
 	StartRun();
+}
+
+void APowderGameMode::OnFinishLineCrossed()
+{
+	if (RunState == EPowderRunState::Running)
+	{
+		SetRunState(EPowderRunState::ScoreScreen);
+	}
 }
 
 void APowderGameMode::SetRunState(EPowderRunState NewState)
