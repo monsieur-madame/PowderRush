@@ -60,6 +60,14 @@ void UPowderMovementComponent::ActivateBoost()
 	}
 }
 
+void UPowderMovementComponent::TriggerSpeedBoost(float BurstSpeed, float Duration)
+{
+	bIsBoosting = true;
+	BoostTimer = Duration;
+	BoostBurstSpeed = BurstSpeed;
+	OnBoostActivated.Broadcast();
+}
+
 float UPowderMovementComponent::GetSpeedNormalized() const
 {
 	return MaxSpeed > 0.0f ? FMath::Clamp(CurrentSpeed / MaxSpeed, 0.0f, 1.0f) : 0.0f;

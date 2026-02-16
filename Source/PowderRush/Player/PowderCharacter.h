@@ -50,9 +50,6 @@ protected:
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UStaticMeshComponent> HeadMesh;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
 	TObjectPtr<USpringArmComponent> SpringArmComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")

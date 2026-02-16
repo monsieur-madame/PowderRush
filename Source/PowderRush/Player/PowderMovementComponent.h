@@ -26,6 +26,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
 	void ActivateBoost();
 
+	/** Fire-and-forget speed boost from powerup pickup (bypasses BoostMeter). */
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
+	void TriggerSpeedBoost(float BurstSpeed, float Duration);
+
 	// --- State Queries ---
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
 	float GetCurrentSpeed() const { return CurrentSpeed; }

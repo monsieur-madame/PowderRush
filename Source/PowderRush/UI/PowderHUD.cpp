@@ -23,6 +23,26 @@ void APowderHUD::BeginPlay()
 	}
 }
 
+void APowderHUD::ShowPowerupIndicator(EPowerupType Type, float Duration)
+{
+	bPowerupActive = true;
+	ActivePowerupType = Type;
+	PowerupTimeRemaining = Duration;
+	PowerupDuration = Duration;
+
+	// Set flash text
+	switch (Type)
+	{
+	case EPowerupType::SpeedBoost:
+		PowerupFlashText = TEXT("SPEED BOOST!");
+		break;
+	case EPowerupType::ScoreMultiplier:
+		PowerupFlashText = TEXT("2x SCORE!");
+		break;
+	}
+	PowerupFlashTimer = PowerupFlashDuration;
+}
+
 void APowderHUD::OnTrickCompleted(EPowderTrickType TrickType, int32 Points)
 {
 	// Map trick type to display name
@@ -53,11 +73,24 @@ void APowderHUD::DrawHUD()
 		return;
 	}
 
-	// Tick trick notification timer
+	// Tick timers
 	float DeltaTime = GetWorld()->GetDeltaSeconds();
 	if (TrickNotificationTimer > 0.0f)
 	{
 		TrickNotificationTimer -= DeltaTime;
+	}
+	if (PowerupFlashTimer > 0.0f)
+	{
+		PowerupFlashTimer -= DeltaTime;
+	}
+	if (bPowerupActive)
+	{
+		PowerupTimeRemaining -= DeltaTime;
+		if (PowerupTimeRemaining <= 0.0f)
+		{
+			bPowerupActive = false;
+			PowerupTimeRemaining = 0.0f;
+		}
 	}
 
 	// Check if we're on the finish/score screen
@@ -149,6 +182,67 @@ void APowderHUD::DrawHUD()
 			DrawRect(FLinearColor(0.15f, 0.15f, 0.15f, 0.6f), ComboBarX, ComboBarY, ComboBarWidth, ComboBarHeight);
 			DrawRect(FLinearColor(1.0f, 0.7f, 0.0f, 1.0f), ComboBarX, ComboBarY, ComboBarWidth * ComboNorm, ComboBarHeight);
 		}
+	}
+
+	// --- Powerup indicator (top-right area) ---
+	if (bPowerupActive)
+	{
+		float IndicatorX = Canvas->SizeX - 200.0f;
+		float IndicatorY = 20.0f;
+		float BarWidth = 160.0f;
+		float BarHeight = 8.0f;
+
+		// Color based on type: blue for speed, gold for score
+		FColor LabelColor;
+		FLinearColor BarColor;
+		FString LabelText;
+		switch (ActivePowerupType)
+		{
+		case EPowerupType::SpeedBoost:
+			LabelColor = FColor(80, 180, 255);
+			BarColor = FLinearColor(0.3f, 0.7f, 1.0f);
+			LabelText = TEXT("SPEED BOOST");
+			break;
+		case EPowerupType::ScoreMultiplier:
+			LabelColor = FColor(255, 220, 80);
+			BarColor = FLinearColor(1.0f, 0.85f, 0.3f);
+			LabelText = TEXT("2x SCORE");
+			break;
+		}
+
+		DrawText(LabelText, LabelColor, IndicatorX, IndicatorY);
+
+		// Timer bar
+		float TimerNorm = (PowerupDuration > 0.0f) ? FMath::Clamp(PowerupTimeRemaining / PowerupDuration, 0.0f, 1.0f) : 0.0f;
+		float TimerBarY = IndicatorY + 20.0f;
+		DrawRect(FLinearColor(0.15f, 0.15f, 0.15f, 0.6f), IndicatorX, TimerBarY, BarWidth, BarHeight);
+		DrawRect(BarColor, IndicatorX, TimerBarY, BarWidth * TimerNorm, BarHeight);
+	}
+
+	// --- Powerup flash text (center screen) ---
+	if (PowerupFlashTimer > 0.0f)
+	{
+		float CenterX = Canvas->SizeX * 0.5f;
+		float FlashY = Canvas->SizeY * 0.28f;
+
+		float Alpha = FMath::Clamp(PowerupFlashTimer / 0.3f, 0.0f, 1.0f);
+
+		FColor FlashColor;
+		switch (ActivePowerupType)
+		{
+		case EPowerupType::SpeedBoost:
+			FlashColor = FColor(80, 180, 255, FMath::RoundToInt32(Alpha * 255));
+			break;
+		case EPowerupType::ScoreMultiplier:
+			FlashColor = FColor(255, 220, 80, FMath::RoundToInt32(Alpha * 255));
+			break;
+		}
+
+		float FlashW, FlashH;
+		GetTextSize(PowerupFlashText, FlashW, FlashH, GEngine->GetLargeFont(), 1.0f);
+		DrawText(PowerupFlashText, FlashColor,
+			CenterX - FlashW * 0.5f, FlashY - FlashH * 0.5f,
+			GEngine->GetLargeFont(), 1.0f);
 	}
 
 	// --- Trick notification (center screen, brief flash) ---

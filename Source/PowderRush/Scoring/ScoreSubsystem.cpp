@@ -13,12 +13,15 @@ void UScoreSubsystem::ResetForNewRun()
     ComboTimer = 0.0f;
     CurrentComboChain = 0;
     MaxSpeedTimer = 0.0f;
+    PowerupMultiplier = 1.0f;
+    PowerupMultiplierTimer = 0.0f;
+    PowerupMultiplierDuration = 0.0f;
 }
 
 void UScoreSubsystem::AddScore(EScoreAction Action, int32 BonusPoints)
 {
     int32 BasePoints = GetBasePoints(Action) + BonusPoints;
-    int32 FinalPoints = FMath::RoundToInt32(BasePoints * CurrentMultiplier);
+    int32 FinalPoints = FMath::RoundToInt32(BasePoints * CurrentMultiplier * PowerupMultiplier);
     CurrentRunStats.TotalScore += FinalPoints;
 
     // Update multiplier
@@ -94,6 +97,19 @@ void UScoreSubsystem::TickComboTimer(float DeltaTime)
             OnComboDropped.Broadcast();
         }
     }
+
+    // Tick powerup multiplier timer
+    if (PowerupMultiplierTimer > 0.0f)
+    {
+        PowerupMultiplierTimer -= DeltaTime;
+        if (PowerupMultiplierTimer <= 0.0f)
+        {
+            PowerupMultiplierTimer = 0.0f;
+            PowerupMultiplier = 1.0f;
+            PowerupMultiplierDuration = 0.0f;
+            OnPowerupMultiplierChanged.Broadcast(PowerupMultiplier);
+        }
+    }
 }
 
 void UScoreSubsystem::TickSpeedBonus(float DeltaTime, float SpeedNormalized)
@@ -122,6 +138,14 @@ void UScoreSubsystem::AwardAirTimeBonus(float AirTime)
     }
 }
 
+void UScoreSubsystem::ActivatePowerupMultiplier(float Multiplier, float Duration)
+{
+    PowerupMultiplier = Multiplier;
+    PowerupMultiplierTimer = Duration;
+    PowerupMultiplierDuration = Duration;
+    OnPowerupMultiplierChanged.Broadcast(PowerupMultiplier);
+}
+
 float UScoreSubsystem::GetComboTimerNormalized() const
 {
     return ComboTimeout > 0.0f ? FMath::Clamp(ComboTimer / ComboTimeout, 0.0f, 1.0f) : 0.0f;
@@ -137,8 +161,9 @@ int32 UScoreSubsystem::GetBasePoints(EScoreAction Action) const
     case EScoreAction::TrickLanded: return 100; // BonusPoints adds up to 400 more
     case EScoreAction::BoostBurst:  return 30;
     case EScoreAction::SpeedBonus:  return 50;
-    case EScoreAction::AirTimeBonus: return 0;  // All via BonusPoints
-    default:                        return 0;
+    case EScoreAction::AirTimeBonus:    return 0;  // All via BonusPoints
+    case EScoreAction::PowerupCollected: return 50;
+    default:                            return 0;
     }
 }
 

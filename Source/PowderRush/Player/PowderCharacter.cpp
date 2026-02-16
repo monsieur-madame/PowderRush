@@ -22,30 +22,17 @@ APowderCharacter::APowderCharacter()
 	CapsuleComp->SetCollisionProfileName(TEXT("Pawn"));
 	SetRootComponent(CapsuleComp);
 
-	// Body mesh (cylinder placeholder)
+	// Skier mesh (pivot is at model center, so Z=0 aligns center-to-center with capsule)
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
 	MeshComp->SetupAttachment(CapsuleComp);
-	MeshComp->SetRelativeLocation(FVector(0.0f, 0.0f, -90.0f));
+	MeshComp->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
 	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	MeshComp->SetRelativeScale3D(FVector(0.4f, 0.4f, 0.9f));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> BodyMeshAsset(
-		TEXT("/Engine/BasicShapes/Cylinder.Cylinder"));
-	if (BodyMeshAsset.Succeeded())
+	MeshComp->SetRelativeScale3D(FVector(1.0f, 1.0f, 1.0f));
+	static ConstructorHelpers::FObjectFinder<UStaticMesh> SkierMeshAsset(
+		TEXT("/Game/Skier/Skier.Skier"));
+	if (SkierMeshAsset.Succeeded())
 	{
-		MeshComp->SetStaticMesh(BodyMeshAsset.Object);
-	}
-
-	// Head mesh (sphere placeholder)
-	HeadMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("HeadMesh"));
-	HeadMesh->SetupAttachment(MeshComp);
-	HeadMesh->SetRelativeLocation(FVector(0.0f, 0.0f, 55.0f));
-	HeadMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	HeadMesh->SetRelativeScale3D(FVector(0.3f, 0.3f, 0.3f));
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> HeadMeshAsset(
-		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
-	if (HeadMeshAsset.Succeeded())
-	{
-		HeadMesh->SetStaticMesh(HeadMeshAsset.Object);
+		MeshComp->SetStaticMesh(SkierMeshAsset.Object);
 	}
 
 	// Spring arm for three-quarter diorama camera

@@ -12,7 +12,8 @@ enum class EScoreAction : uint8
     TrickLanded,
     BoostBurst,
     SpeedBonus,
-    AirTimeBonus
+    AirTimeBonus,
+    PowerupCollected
 };
 
 USTRUCT(BlueprintType)
@@ -77,6 +78,18 @@ public:
     UFUNCTION(BlueprintCallable, Category = "PowderRush|Score")
     void AwardAirTimeBonus(float AirTime);
 
+    UFUNCTION(BlueprintCallable, Category = "PowderRush|Score")
+    void ActivatePowerupMultiplier(float Multiplier, float Duration);
+
+    UFUNCTION(BlueprintPure, Category = "PowderRush|Score")
+    float GetPowerupMultiplier() const { return PowerupMultiplier; }
+
+    UFUNCTION(BlueprintPure, Category = "PowderRush|Score")
+    float GetPowerupMultiplierTimeRemaining() const { return PowerupMultiplierTimer; }
+
+    UFUNCTION(BlueprintPure, Category = "PowderRush|Score")
+    float GetPowerupMultiplierDuration() const { return PowerupMultiplierDuration; }
+
     // Queries
     UFUNCTION(BlueprintPure, Category = "PowderRush|Score")
     int32 GetCurrentScore() const { return CurrentRunStats.TotalScore; }
@@ -106,6 +119,10 @@ public:
     UPROPERTY(BlueprintAssignable, Category = "PowderRush|Score")
     FOnComboDropped OnComboDropped;
 
+    DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPowerupMultiplierChanged, float, NewMultiplier);
+    UPROPERTY(BlueprintAssignable, Category = "PowderRush|Score")
+    FOnPowerupMultiplierChanged OnPowerupMultiplierChanged;
+
 protected:
     UPROPERTY()
     FRunStats CurrentRunStats;
@@ -114,6 +131,10 @@ protected:
     float ComboTimer = 0.0f;
     int32 CurrentComboChain = 0;
     float MaxSpeedTimer = 0.0f;
+
+    float PowerupMultiplier = 1.0f;
+    float PowerupMultiplierTimer = 0.0f;
+    float PowerupMultiplierDuration = 0.0f;
 
     static constexpr float ComboTimeout = 2.0f;
     static constexpr float MaxMultiplier = 10.0f;

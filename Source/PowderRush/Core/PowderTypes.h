@@ -32,6 +32,15 @@ enum class EZoneType : uint8
 	JumpPark
 };
 
+// --- Powerup Types ---
+
+UENUM(BlueprintType)
+enum class EPowerupType : uint8
+{
+	SpeedBoost,
+	ScoreMultiplier
+};
+
 // --- Trick System Types ---
 
 UENUM(BlueprintType)
