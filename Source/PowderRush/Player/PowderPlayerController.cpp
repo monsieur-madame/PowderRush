@@ -112,13 +112,6 @@ void APowderPlayerController::Tick(float DeltaTime)
 	else
 	{
 		Movement->ReleaseCarve();
-
-		// Auto-activate boost when releasing a full meter carve
-		if (Movement->GetBoostMeter() >= 1.0f)
-		{
-			Movement->ActivateBoost();
-		}
-
 		KeyboardHoldDuration = 0.0f;
 	}
 }

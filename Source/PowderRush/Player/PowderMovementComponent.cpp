@@ -131,13 +131,6 @@ void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 
 	// Derive DesiredYaw from slope forward + carve angle offset
 	DesiredYaw = SlopeForward.Rotation().Yaw + CurrentCarveAngle;
-
-	// Build boost meter while actively carving
-	if (IsCarving() && CurrentSpeed > MaxSpeed * 0.2f)
-	{
-		float CarveIntensity = FMath::Abs(CarveInput);
-		BoostMeter = FMath::Clamp(BoostMeter + BoostFillRate * CarveIntensity * DeltaTime, 0.0f, 1.0f);
-	}
 }
 
 void UPowderMovementComponent::UpdateSpeed(float DeltaTime)
