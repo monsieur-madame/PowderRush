@@ -69,13 +69,13 @@ void APowderPlayerController::Tick(float DeltaTime)
 	if (bTouchActive)
 	{
 		TouchHoldDuration += DeltaTime;
-		float Intensity = FMath::Clamp(TouchHoldDuration / 0.25f, 0.6f, 1.0f);
+		float Intensity = FMath::Clamp(TouchHoldDuration / 0.25f, 0.4f, 1.0f);
 		Movement->SetCarveInput(TouchCarveInput * Intensity);
 	}
 	else if (bKeyboardCarveLeft || bKeyboardCarveRight)
 	{
 		KeyboardHoldDuration += DeltaTime;
-		float Intensity = FMath::Clamp(KeyboardHoldDuration / 0.25f, 0.6f, 1.0f);
+		float Intensity = FMath::Clamp(KeyboardHoldDuration / 0.25f, 0.4f, 1.0f);
 		float Direction = 0.0f;
 		if (bKeyboardCarveLeft) Direction -= 1.0f;
 		if (bKeyboardCarveRight) Direction += 1.0f;

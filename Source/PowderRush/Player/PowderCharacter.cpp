@@ -106,8 +106,14 @@ void APowderCharacter::UpdateDioramaCamera(float DeltaTime)
 
 	FRotator CurrentRot = SpringArmComp->GetRelativeRotation();
 	FRotator TargetRot(TargetPitch, TargetYaw, 0.0f);
+
+	// Asymmetric interp: slower return-to-center for cinematic feel
+	float CurrentYawAbs = FMath::Abs(CurrentRot.Yaw - BaseYawOffset);
+	float TargetYawAbs = FMath::Abs(TargetYaw - BaseYawOffset);
+	float RotSpeed = (TargetYawAbs < CurrentYawAbs) ? ReturnToFrontSpeed : RotationInterpSpeed;
+
 	SpringArmComp->SetRelativeRotation(
-		FMath::RInterpTo(CurrentRot, TargetRot, DeltaTime, RotationInterpSpeed));
+		FMath::RInterpTo(CurrentRot, TargetRot, DeltaTime, RotSpeed));
 
 	// FOV: subtle widen at speed (60 at rest, 70 at max)
 	float TargetFOV = FMath::Lerp(BaseFOV, MaxFOV, SpeedNorm);

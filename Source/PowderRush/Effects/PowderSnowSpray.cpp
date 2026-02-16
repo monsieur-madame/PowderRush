@@ -1,4 +1,5 @@
 #include "Effects/PowderSnowSpray.h"
+#include "Effects/PowderMaterialHelper.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "UObject/ConstructorHelpers.h"
@@ -43,11 +44,11 @@ void UPowderSnowSpray::InitPool()
 		P.Mesh->SetVisibility(false);
 		P.Mesh->RegisterComponent();
 
-		// Try to apply white material
-		UMaterialInstanceDynamic* MID = P.Mesh->CreateAndSetMaterialInstanceDynamic(0);
+		// Apply snow-white material via the shared color material
+		UMaterialInstanceDynamic* MID = PowderMaterialHelper::CreateColorMID(Owner, FLinearColor(0.95f, 0.95f, 1.0f));
 		if (MID)
 		{
-			MID->SetVectorParameterValue(TEXT("Color"), FLinearColor(0.95f, 0.95f, 1.0f));
+			P.Mesh->SetMaterial(0, MID);
 		}
 
 		P.bActive = false;

@@ -88,7 +88,7 @@ public:
 	float CarveSpeedBleed = 0.15f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveRate = 8.0f;
+	float CarveRate = 5.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float MaxCarveAngle = 60.0f;

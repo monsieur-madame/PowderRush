@@ -82,13 +82,16 @@ protected:
 	float MaxFOV = 82.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float ArmLengthInterpSpeed = 8.0f;
+	float ArmLengthInterpSpeed = 3.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float RotationInterpSpeed = 10.0f;
+	float RotationInterpSpeed = 3.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float FOVInterpSpeed = 8.0f;
+	float ReturnToFrontSpeed = 1.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float FOVInterpSpeed = 3.0f;
 
 	void UpdateDioramaCamera(float DeltaTime);
 	void UpdateSnowSpray();

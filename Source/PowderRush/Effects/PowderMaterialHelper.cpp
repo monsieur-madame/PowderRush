@@ -2,10 +2,6 @@
 #include "Materials/Material.h"
 #include "Materials/MaterialInstanceDynamic.h"
 
-#if WITH_EDITORONLY_DATA
-#include "Materials/MaterialExpressionVectorParameter.h"
-#endif
-
 namespace PowderMaterialHelper
 {
 	static TWeakObjectPtr<UMaterial> CachedMaterial;
@@ -18,19 +14,11 @@ namespace PowderMaterialHelper
 			return CachedMaterial.Get();
 		}
 
-		UMaterial* Mat = NewObject<UMaterial>(GetTransientPackage(), TEXT("PowderColorMaterial"), RF_Transient);
-
-#if WITH_EDITORONLY_DATA
-		UMaterialExpressionVectorParameter* Param = NewObject<UMaterialExpressionVectorParameter>(Mat);
-		Param->ParameterName = TEXT("Color");
-		Param->DefaultValue = FLinearColor::White;
-
-		Mat->GetEditorOnlyData()->ExpressionCollection.AddExpression(Param);
-		Mat->GetEditorOnlyData()->BaseColor.Connect(0, Param);
-		Mat->PostEditChange();
-#endif
-
-		CachedMaterial = Mat;
+		UMaterial* Mat = LoadObject<UMaterial>(nullptr, TEXT("/Game/Materials/M_PowderColor.M_PowderColor"));
+		if (Mat)
+		{
+			CachedMaterial = Mat;
+		}
 		return Mat;
 	}
 
@@ -57,21 +45,11 @@ namespace PowderMaterialHelper
 			return CachedSkyMaterial.Get();
 		}
 
-		UMaterial* Mat = NewObject<UMaterial>(GetTransientPackage(), TEXT("PowderSkyDomeMaterial"), RF_Transient);
-		Mat->TwoSided = true;
-		Mat->SetShadingModel(MSM_Unlit);
-
-#if WITH_EDITORONLY_DATA
-		UMaterialExpressionVectorParameter* Param = NewObject<UMaterialExpressionVectorParameter>(Mat);
-		Param->ParameterName = TEXT("Color");
-		Param->DefaultValue = FLinearColor(0.4f, 0.65f, 0.95f);
-
-		Mat->GetEditorOnlyData()->ExpressionCollection.AddExpression(Param);
-		Mat->GetEditorOnlyData()->EmissiveColor.Connect(0, Param);
-		Mat->PostEditChange();
-#endif
-
-		CachedSkyMaterial = Mat;
+		UMaterial* Mat = LoadObject<UMaterial>(nullptr, TEXT("/Game/Materials/M_PowderSkydome.M_PowderSkydome"));
+		if (Mat)
+		{
+			CachedSkyMaterial = Mat;
+		}
 		return Mat;
 	}
 
