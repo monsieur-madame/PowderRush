@@ -4,6 +4,7 @@
 #include "Components/StaticMeshComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
+#include "NiagaraComponent.h"
 
 APowderCharacter::APowderCharacter()
 {
@@ -41,20 +42,28 @@ APowderCharacter::APowderCharacter()
 		HeadMesh->SetStaticMesh(HeadMeshAsset.Object);
 	}
 
-	// Spring arm for camera
+	// Spring arm for three-quarter diorama camera
 	SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
 	SpringArmComp->SetupAttachment(CapsuleComp);
-	SpringArmComp->TargetArmLength = 400.0f;
-	SpringArmComp->SetRelativeRotation(FRotator(-20.0f, 0.0f, 0.0f));
+	SpringArmComp->TargetArmLength = 900.0f;
+	SpringArmComp->SetRelativeRotation(FRotator(-45.0f, 30.0f, 0.0f));
 	SpringArmComp->bUsePawnControlRotation = false;
 	SpringArmComp->bEnableCameraLag = true;
-	SpringArmComp->CameraLagSpeed = 5.0f;
+	SpringArmComp->CameraLagSpeed = 3.0f;
 	SpringArmComp->bEnableCameraRotationLag = true;
-	SpringArmComp->CameraRotationLagSpeed = 5.0f;
+	SpringArmComp->CameraRotationLagSpeed = 3.0f;
+	SpringArmComp->bDoCollisionTest = false;
 
 	// Camera
 	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
 	CameraComp->SetupAttachment(SpringArmComp);
+	CameraComp->FieldOfView = 60.0f;
+
+	// Snow spray particle (Niagara system set in Blueprint)
+	SnowSprayComp = CreateDefaultSubobject<UNiagaraComponent>(TEXT("SnowSpray"));
+	SnowSprayComp->SetupAttachment(CapsuleComp);
+	SnowSprayComp->SetRelativeLocation(FVector(0.0f, 0.0f, -80.0f));
+	SnowSprayComp->SetAutoActivate(false);
 
 	// Custom movement
 	MovementComp = CreateDefaultSubobject<UPowderMovementComponent>(TEXT("PowderMovement"));
@@ -70,27 +79,68 @@ void APowderCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// Dynamic camera: pull back at speed, push in during carves
-	if (MovementComp && SpringArmComp)
+	UpdateDioramaCamera(DeltaTime);
+	UpdateSnowSpray();
+}
+
+void APowderCharacter::UpdateDioramaCamera(float DeltaTime)
+{
+	if (!MovementComp || !SpringArmComp || !CameraComp)
 	{
-		float SpeedNorm = MovementComp->GetSpeedNormalized();
+		return;
+	}
 
-		// Arm length: 300 at rest, 600 at max speed
-		float TargetArmLength = FMath::Lerp(300.0f, 600.0f, SpeedNorm);
-		SpringArmComp->TargetArmLength = FMath::FInterpTo(
-			SpringArmComp->TargetArmLength, TargetArmLength, DeltaTime, 3.0f);
+	float SpeedNorm = MovementComp->GetSpeedNormalized();
 
-		// Camera pitch: -15 at rest, -25 at max speed
-		float TargetPitch = FMath::Lerp(-15.0f, -25.0f, SpeedNorm);
+	// Arm length: pulls back at speed (900 at rest, 1200 at max speed)
+	float TargetArmLength = FMath::Lerp(BaseArmLength, MaxArmLength, SpeedNorm);
+	SpringArmComp->TargetArmLength = FMath::FInterpTo(
+		SpringArmComp->TargetArmLength, TargetArmLength, DeltaTime, 2.0f);
 
-		// Camera roll tilt into carves
+	// Pitch: lowers at speed to reveal more terrain ahead (-45 at rest, -35 at max)
+	float TargetPitch = FMath::Lerp(BasePitch, SpeedPitch, SpeedNorm);
+
+	// Yaw: base offset + tracks carve direction to preview player's path
+	float CarveAngle = MovementComp->GetCarveAngle();
+	float CarveNorm = CarveAngle / MovementComp->MaxCarveAngle; // -1 to 1
+	float TargetYaw = BaseYawOffset + (CarveNorm * CarveYawInfluence);
+
+	FRotator CurrentRot = SpringArmComp->GetRelativeRotation();
+	FRotator TargetRot(TargetPitch, TargetYaw, 0.0f);
+	SpringArmComp->SetRelativeRotation(
+		FMath::RInterpTo(CurrentRot, TargetRot, DeltaTime, 3.0f));
+
+	// FOV: subtle widen at speed (60 at rest, 70 at max)
+	float TargetFOV = FMath::Lerp(BaseFOV, MaxFOV, SpeedNorm);
+	CameraComp->FieldOfView = FMath::FInterpTo(
+		CameraComp->FieldOfView, TargetFOV, DeltaTime, 3.0f);
+}
+
+void APowderCharacter::UpdateSnowSpray()
+{
+	if (!MovementComp || !SnowSprayComp)
+	{
+		return;
+	}
+
+	bool bShouldSpray = MovementComp->IsCarving() &&
+		MovementComp->GetCurrentSpeed() > MovementComp->MaxSpeed * 0.15f;
+
+	if (bShouldSpray && !SnowSprayComp->IsActive())
+	{
+		SnowSprayComp->Activate();
+	}
+	else if (!bShouldSpray && SnowSprayComp->IsActive())
+	{
+		SnowSprayComp->Deactivate();
+	}
+
+	// Orient spray opposite to carve direction
+	if (bShouldSpray)
+	{
 		float CarveAngle = MovementComp->GetCarveAngle();
-		float TargetRoll = CarveAngle * 0.1f;
-
-		FRotator CurrentRot = SpringArmComp->GetRelativeRotation();
-		FRotator TargetRot(TargetPitch, CurrentRot.Yaw, TargetRoll);
-		SpringArmComp->SetRelativeRotation(
-			FMath::RInterpTo(CurrentRot, TargetRot, DeltaTime, 4.0f));
+		float SprayYaw = (CarveAngle > 0.0f) ? -90.0f : 90.0f;
+		SnowSprayComp->SetRelativeRotation(FRotator(0.0f, SprayYaw, 0.0f));
 	}
 }
 

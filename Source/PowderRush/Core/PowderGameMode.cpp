@@ -14,6 +14,9 @@ APowderGameMode::APowderGameMode()
 void APowderGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Auto-start run for prototyping — skip menu flow
+	StartRun();
 }
 
 void APowderGameMode::StartRun()

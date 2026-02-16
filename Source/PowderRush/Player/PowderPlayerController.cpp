@@ -31,17 +31,66 @@ void APowderPlayerController::SetupInputComponent()
 {
 	Super::SetupInputComponent();
 
-	// Bind touch events via input component
+	// Bind touch events
 	InputComponent->BindTouch(IE_Pressed, this, &APowderPlayerController::HandleTouchBegin);
 	InputComponent->BindTouch(IE_Released, this, &APowderPlayerController::HandleTouchEnd);
 	InputComponent->BindTouch(IE_Repeat, this, &APowderPlayerController::HandleTouchMove);
+
+	// Keyboard bindings for desktop testing (A/D or Left/Right arrows)
+	InputComponent->BindKey(EKeys::A, IE_Pressed, this, &APowderPlayerController::HandleKeyCarveLeftPressed);
+	InputComponent->BindKey(EKeys::A, IE_Released, this, &APowderPlayerController::HandleKeyCarveLeftReleased);
+	InputComponent->BindKey(EKeys::D, IE_Pressed, this, &APowderPlayerController::HandleKeyCarveRightPressed);
+	InputComponent->BindKey(EKeys::D, IE_Released, this, &APowderPlayerController::HandleKeyCarveRightReleased);
+	InputComponent->BindKey(EKeys::Left, IE_Pressed, this, &APowderPlayerController::HandleKeyCarveLeftPressed);
+	InputComponent->BindKey(EKeys::Left, IE_Released, this, &APowderPlayerController::HandleKeyCarveLeftReleased);
+	InputComponent->BindKey(EKeys::Right, IE_Pressed, this, &APowderPlayerController::HandleKeyCarveRightPressed);
+	InputComponent->BindKey(EKeys::Right, IE_Released, this, &APowderPlayerController::HandleKeyCarveRightReleased);
 }
 
 void APowderPlayerController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
-	// Cache movement component reference
+	UPowderMovementComponent* Movement = GetMovementComp();
+	if (!Movement)
+	{
+		return;
+	}
+
+	// Determine active carve input: touch takes priority, then keyboard
+	bool bAnyInput = bTouchActive || bKeyboardCarveLeft || bKeyboardCarveRight;
+
+	if (bTouchActive)
+	{
+		TouchHoldDuration += DeltaTime;
+		float Intensity = FMath::Clamp(TouchHoldDuration / 0.5f, 0.3f, 1.0f);
+		Movement->SetCarveInput(TouchCarveInput * Intensity);
+	}
+	else if (bKeyboardCarveLeft || bKeyboardCarveRight)
+	{
+		KeyboardHoldDuration += DeltaTime;
+		float Intensity = FMath::Clamp(KeyboardHoldDuration / 0.5f, 0.3f, 1.0f);
+		float Direction = 0.0f;
+		if (bKeyboardCarveLeft) Direction -= 1.0f;
+		if (bKeyboardCarveRight) Direction += 1.0f;
+		Movement->SetCarveInput(Direction * Intensity);
+	}
+	else
+	{
+		Movement->ReleaseCarve();
+
+		// Auto-activate boost when releasing a full meter carve
+		if (Movement->GetBoostMeter() >= 1.0f)
+		{
+			Movement->ActivateBoost();
+		}
+
+		KeyboardHoldDuration = 0.0f;
+	}
+}
+
+UPowderMovementComponent* APowderPlayerController::GetMovementComp()
+{
 	if (!CachedMovement)
 	{
 		if (APowderCharacter* PowderChar = Cast<APowderCharacter>(GetPawn()))
@@ -49,28 +98,7 @@ void APowderPlayerController::Tick(float DeltaTime)
 			CachedMovement = PowderChar->GetPowderMovement();
 		}
 	}
-
-	// Update carve input to movement component
-	if (CachedMovement)
-	{
-		if (bTouchActive)
-		{
-			TouchHoldDuration += DeltaTime;
-			// Carve intensity ramps up with hold duration (max at 0.5s hold)
-			float Intensity = FMath::Clamp(TouchHoldDuration / 0.5f, 0.3f, 1.0f);
-			CachedMovement->SetCarveInput(TouchCarveInput * Intensity);
-		}
-		else
-		{
-			CachedMovement->ReleaseCarve();
-
-			// Auto-activate boost when releasing a full meter carve
-			if (CachedMovement->GetBoostMeter() >= 1.0f)
-			{
-				CachedMovement->ActivateBoost();
-			}
-		}
-	}
+	return CachedMovement.Get();
 }
 
 void APowderPlayerController::HandleTouchBegin(ETouchIndex::Type FingerIndex, FVector Location)

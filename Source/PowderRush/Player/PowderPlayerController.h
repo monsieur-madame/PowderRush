@@ -36,6 +36,11 @@ protected:
 	float TouchCarveInput = 0.0f;
 	float TouchHoldDuration = 0.0f;
 
+	// Keyboard state tracking (desktop testing)
+	bool bKeyboardCarveLeft = false;
+	bool bKeyboardCarveRight = false;
+	float KeyboardHoldDuration = 0.0f;
+
 	UPROPERTY()
 	TObjectPtr<UPowderMovementComponent> CachedMovement;
 
@@ -44,4 +49,12 @@ protected:
 	void HandleTouchMove(ETouchIndex::Type FingerIndex, FVector Location);
 
 	void ProcessTouchLocation(const FVector& Location);
+
+	// Keyboard handlers for desktop testing
+	void HandleKeyCarveLeftPressed() { bKeyboardCarveLeft = true; KeyboardHoldDuration = 0.0f; }
+	void HandleKeyCarveLeftReleased() { bKeyboardCarveLeft = false; }
+	void HandleKeyCarveRightPressed() { bKeyboardCarveRight = true; KeyboardHoldDuration = 0.0f; }
+	void HandleKeyCarveRightReleased() { bKeyboardCarveRight = false; }
+
+	UPowderMovementComponent* GetMovementComp();
 };
