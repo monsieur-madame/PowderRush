@@ -52,7 +52,20 @@ public:
 	void LaunchIntoAir(FVector AdditionalVelocity);
 
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
+	void TriggerWipeout();
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
 	void ResetMovementState();
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
+	float GetSlopeForwardYaw() const { return SlopeForward.Rotation().Yaw; }
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
+	float GetDesiredYaw() const { return DesiredYaw; }
+
+	// --- Tuning Profile ---
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement|Tuning")
+	void ApplyTuningProfile(const FMovementTuning& Tuning, float BlendTime);
 
 	// --- Events ---
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnBoostActivated);
@@ -85,16 +98,25 @@ public:
 	float BaseFriction = 0.02f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveSpeedBleed = 0.15f;
+	float CarveSpeedBleed = 0.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveRate = 5.0f;
+	float CarveRate = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float MaxCarveAngle = 60.0f;
+	float CarveReturnRate = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float MaxCarveAngle = 90.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float YawRate = 90.0f;  // Degrees per second at full carve input
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float CarveLateralSpeed = 1400.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarveBleedSmoothing = 1.5f;  // How fast speed penalty ramps up/down (lower = smoother transitions)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float BoostFillRate = 0.3f;
@@ -134,6 +156,7 @@ protected:
 	FVector SlopeForward = FVector::ForwardVector;
 	float DesiredYaw = 0.0f;
 	bool bOnGround = false;
+	float SmoothedCarveBleed = 0.0f;
 
 	// Wipeout recovery
 	float WipeoutRecoveryTimer = 0.0f;
@@ -142,4 +165,12 @@ protected:
 	bool bIsAirborne = false;
 	FVector AirborneVelocity = FVector::ZeroVector;
 	float AirborneTimer = 0.0f;
+
+	// Tuning blend state
+	void TickTuningBlend(float DeltaTime);
+	bool bIsBlendingTuning = false;
+	float TuningBlendAlpha = 0.0f;
+	float TuningBlendDuration = 1.0f;
+	FMovementTuning TuningBlendTarget;
+	FMovementTuning TuningBlendStart;
 };

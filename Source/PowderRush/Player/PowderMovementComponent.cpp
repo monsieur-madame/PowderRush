@@ -31,6 +31,7 @@ void UPowderMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 		return;
 	}
 
+	TickTuningBlend(DeltaTime);
 	UpdateTerrainFollowing(DeltaTime);
 	UpdateCarving(DeltaTime);
 	UpdateSpeed(DeltaTime);
@@ -117,17 +118,19 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 
 void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 {
-	// Smoothly interpolate carve angle toward target
 	float TargetAngle = CarveInput * MaxCarveAngle;
 	float InterpSpeed = CarveRate;
 
-	// Return to center faster than carving in (snappy response)
+	// Use separate (slower) return rate when releasing input
 	if (FMath::Abs(TargetAngle) < FMath::Abs(CurrentCarveAngle))
 	{
-		InterpSpeed *= 2.0f;
+		InterpSpeed = CarveReturnRate;
 	}
 
 	CurrentCarveAngle = FMath::FInterpTo(CurrentCarveAngle, TargetAngle, DeltaTime, InterpSpeed);
+
+	// Derive DesiredYaw from slope forward + carve angle offset
+	DesiredYaw = SlopeForward.Rotation().Yaw + CurrentCarveAngle;
 
 	// Build boost meter while actively carving
 	if (IsCarving() && CurrentSpeed > MaxSpeed * 0.2f)
@@ -152,13 +155,12 @@ void UPowderMovementComponent::UpdateSpeed(float DeltaTime)
 	// Surface friction
 	float SurfaceFriction = BaseFriction * CurrentSurface.Friction;
 
-	// Carve speed bleed - deeper carves lose more speed
-	float CarveBleed = 0.0f;
-	if (IsCarving())
-	{
-		float CarveDepth = FMath::Abs(CurrentCarveAngle) / MaxCarveAngle;
-		CarveBleed = CarveSpeedBleed * CarveDepth;
-	}
+	// Carve speed bleed - based on heading deviation from downhill, smoothed to prevent sudden speed changes
+	float HeadingDelta = FMath::Abs(FMath::FindDeltaAngleDegrees(SlopeForward.Rotation().Yaw, DesiredYaw));
+	float CarveDepth = FMath::Clamp(HeadingDelta / 90.0f, 0.0f, 1.0f);
+	float RawCarveBleed = CarveSpeedBleed * CarveDepth;
+	SmoothedCarveBleed = FMath::FInterpTo(SmoothedCarveBleed, RawCarveBleed, DeltaTime, CarveBleedSmoothing);
+	float CarveBleed = SmoothedCarveBleed;
 
 	// Apply equipment modifiers
 	float SpeedMod = EquipmentStats.SpeedMultiplier;
@@ -196,30 +198,18 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 		EffectiveSpeed += BoostBurstSpeed;
 	}
 
-	FVector ForwardMovement = SlopeForward * EffectiveSpeed * DeltaTime;
-
-	// Lateral movement from carving
-	FVector Right = FVector::CrossProduct(SlopeNormal, SlopeForward).GetSafeNormal();
-	float LateralAmount = FMath::Sin(FMath::DegreesToRadians(CurrentCarveAngle));
-	float LateralMod = EquipmentStats.CarveMultiplier;
-	FVector LateralMovement = Right * LateralAmount * CarveLateralSpeed * LateralMod * DeltaTime;
-
-	// Combine and apply
-	FVector TotalMovement = ForwardMovement + LateralMovement;
+	// Movement direction is based on persistent heading (DesiredYaw)
+	FVector MoveDirection = FRotator(0.0f, DesiredYaw, 0.0f).Vector();
+	// Project onto slope plane to stay on terrain
+	MoveDirection = FVector::VectorPlaneProject(MoveDirection, SlopeNormal).GetSafeNormal();
+	FVector TotalMovement = MoveDirection * EffectiveSpeed * DeltaTime;
 	Velocity = TotalMovement / DeltaTime;
 
-	// Rotate capsule to face movement direction — Yaw only, no Pitch/Roll
-	// Visual tilt is handled by the spring arm camera in PowderCharacter::Tick
+	// Rotate capsule to face heading — Yaw only
 	FRotator DesiredRotation = UpdatedComponent->GetComponentRotation();
 	DesiredRotation.Pitch = 0.0f;
 	DesiredRotation.Roll = 0.0f;
-	if (!SlopeForward.IsNearlyZero())
-	{
-		// Stable yaw: rotate SlopeForward by carve angle around Up axis
-		FVector CarvedDirection = SlopeForward.RotateAngleAxis(CurrentCarveAngle, FVector::UpVector);
-		DesiredYaw = CarvedDirection.Rotation().Yaw;
-		DesiredRotation.Yaw = DesiredYaw;
-	}
+	DesiredRotation.Yaw = DesiredYaw;
 
 	FHitResult Hit;
 	UpdatedComponent->MoveComponent(TotalMovement, DesiredRotation, true, &Hit);
@@ -238,6 +228,13 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 
 }
 
+void UPowderMovementComponent::TriggerWipeout()
+{
+	CurrentSpeed *= 0.5f;
+	WipeoutRecoveryTimer = 0.3f;
+	OnWipeout.Broadcast();
+}
+
 void UPowderMovementComponent::ResetMovementState()
 {
 	CurrentSpeed = 0.0f;
@@ -251,6 +248,7 @@ void UPowderMovementComponent::ResetMovementState()
 	bIsBoosting = false;
 	BoostTimer = 0.0f;
 	DesiredYaw = 0.0f;
+	SmoothedCarveBleed = 0.0f;
 	Velocity = FVector::ZeroVector;
 }
 
@@ -302,5 +300,60 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 		AirborneTimer = 0.0f;
 
 		OnLanded.Broadcast(AirTime);
+	}
+}
+
+void UPowderMovementComponent::ApplyTuningProfile(const FMovementTuning& Tuning, float BlendTime)
+{
+	// Snapshot current values as blend start
+	TuningBlendStart.GravityAcceleration = GravityAcceleration;
+	TuningBlendStart.SlopeAngle = SlopeAngle;
+	TuningBlendStart.MaxSpeed = MaxSpeed;
+	TuningBlendStart.BaseFriction = BaseFriction;
+	TuningBlendStart.CarveSpeedBleed = CarveSpeedBleed;
+	TuningBlendStart.CarveBleedSmoothing = CarveBleedSmoothing;
+	TuningBlendStart.CarveRate = CarveRate;
+	TuningBlendStart.CarveReturnRate = CarveReturnRate;
+	TuningBlendStart.MaxCarveAngle = MaxCarveAngle;
+	TuningBlendStart.YawRate = YawRate;
+	TuningBlendStart.CarveLateralSpeed = CarveLateralSpeed;
+	TuningBlendStart.BoostFillRate = BoostFillRate;
+	TuningBlendStart.BoostBurstSpeed = BoostBurstSpeed;
+	TuningBlendStart.BoostDuration = BoostDuration;
+
+	TuningBlendTarget = Tuning;
+	TuningBlendDuration = FMath::Max(BlendTime, KINDA_SMALL_NUMBER);
+	TuningBlendAlpha = 0.0f;
+	bIsBlendingTuning = true;
+}
+
+void UPowderMovementComponent::TickTuningBlend(float DeltaTime)
+{
+	if (!bIsBlendingTuning)
+	{
+		return;
+	}
+
+	TuningBlendAlpha = FMath::Clamp(TuningBlendAlpha + DeltaTime / TuningBlendDuration, 0.0f, 1.0f);
+	float Alpha = TuningBlendAlpha;
+
+	GravityAcceleration = FMath::Lerp(TuningBlendStart.GravityAcceleration, TuningBlendTarget.GravityAcceleration, Alpha);
+	SlopeAngle = FMath::Lerp(TuningBlendStart.SlopeAngle, TuningBlendTarget.SlopeAngle, Alpha);
+	MaxSpeed = FMath::Lerp(TuningBlendStart.MaxSpeed, TuningBlendTarget.MaxSpeed, Alpha);
+	BaseFriction = FMath::Lerp(TuningBlendStart.BaseFriction, TuningBlendTarget.BaseFriction, Alpha);
+	CarveSpeedBleed = FMath::Lerp(TuningBlendStart.CarveSpeedBleed, TuningBlendTarget.CarveSpeedBleed, Alpha);
+	CarveBleedSmoothing = FMath::Lerp(TuningBlendStart.CarveBleedSmoothing, TuningBlendTarget.CarveBleedSmoothing, Alpha);
+	CarveRate = FMath::Lerp(TuningBlendStart.CarveRate, TuningBlendTarget.CarveRate, Alpha);
+	CarveReturnRate = FMath::Lerp(TuningBlendStart.CarveReturnRate, TuningBlendTarget.CarveReturnRate, Alpha);
+	MaxCarveAngle = FMath::Lerp(TuningBlendStart.MaxCarveAngle, TuningBlendTarget.MaxCarveAngle, Alpha);
+	YawRate = FMath::Lerp(TuningBlendStart.YawRate, TuningBlendTarget.YawRate, Alpha);
+	CarveLateralSpeed = FMath::Lerp(TuningBlendStart.CarveLateralSpeed, TuningBlendTarget.CarveLateralSpeed, Alpha);
+	BoostFillRate = FMath::Lerp(TuningBlendStart.BoostFillRate, TuningBlendTarget.BoostFillRate, Alpha);
+	BoostBurstSpeed = FMath::Lerp(TuningBlendStart.BoostBurstSpeed, TuningBlendTarget.BoostBurstSpeed, Alpha);
+	BoostDuration = FMath::Lerp(TuningBlendStart.BoostDuration, TuningBlendTarget.BoostDuration, Alpha);
+
+	if (Alpha >= 1.0f)
+	{
+		bIsBlendingTuning = false;
 	}
 }

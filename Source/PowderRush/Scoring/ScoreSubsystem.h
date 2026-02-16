@@ -10,7 +10,9 @@ enum class EScoreAction : uint8
     NearMiss,
     GatePass,
     TrickLanded,
-    BoostBurst
+    BoostBurst,
+    SpeedBonus,
+    AirTimeBonus
 };
 
 USTRUCT(BlueprintType)
@@ -69,6 +71,12 @@ public:
     UFUNCTION(BlueprintCallable, Category = "PowderRush|Score")
     void TickComboTimer(float DeltaTime);
 
+    UFUNCTION(BlueprintCallable, Category = "PowderRush|Score")
+    void TickSpeedBonus(float DeltaTime, float SpeedNormalized);
+
+    UFUNCTION(BlueprintCallable, Category = "PowderRush|Score")
+    void AwardAirTimeBonus(float AirTime);
+
     // Queries
     UFUNCTION(BlueprintPure, Category = "PowderRush|Score")
     int32 GetCurrentScore() const { return CurrentRunStats.TotalScore; }
@@ -105,6 +113,7 @@ protected:
     float CurrentMultiplier = 1.0f;
     float ComboTimer = 0.0f;
     int32 CurrentComboChain = 0;
+    float MaxSpeedTimer = 0.0f;
 
     static constexpr float ComboTimeout = 2.0f;
     static constexpr float MaxMultiplier = 10.0f;

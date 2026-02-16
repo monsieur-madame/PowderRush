@@ -1,5 +1,8 @@
 #include "Player/PowderCharacter.h"
 #include "Player/PowderMovementComponent.h"
+#include "Player/PowderTrickComponent.h"
+#include "Scoring/ScoreSubsystem.h"
+#include "Engine/GameInstance.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
@@ -7,6 +10,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Effects/PowderSnowSpray.h"
+#include "Core/PowderTuningProfile.h"
 
 APowderCharacter::APowderCharacter()
 {
@@ -49,6 +53,7 @@ APowderCharacter::APowderCharacter()
 	SpringArmComp->SetupAttachment(CapsuleComp);
 	SpringArmComp->TargetArmLength = 900.0f;
 	SpringArmComp->SetRelativeRotation(FRotator(-45.0f, 30.0f, 0.0f));
+	SpringArmComp->SetUsingAbsoluteRotation(true);
 	SpringArmComp->bUsePawnControlRotation = false;
 	SpringArmComp->bEnableCameraLag = false;
 	SpringArmComp->bEnableCameraRotationLag = false;
@@ -67,19 +72,44 @@ APowderCharacter::APowderCharacter()
 	// Custom movement
 	MovementComp = CreateDefaultSubobject<UPowderMovementComponent>(TEXT("PowderMovement"));
 	MovementComp->SetUpdatedComponent(CapsuleComp);
+
+	// Trick system
+	TrickComp = CreateDefaultSubobject<UPowderTrickComponent>(TEXT("TrickComponent"));
 }
 
 void APowderCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Wire wipeout to scoring system reset
+	if (MovementComp)
+	{
+		MovementComp->OnWipeout.AddDynamic(this, &APowderCharacter::HandleWipeout);
+	}
 }
 
 void APowderCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
 
+	TickCameraTuningBlend(DeltaTime);
 	UpdateDioramaCamera(DeltaTime);
 	UpdateSnowSpray();
+
+	// Drive scoring ticks
+	if (UScoreSubsystem* ScoreSys = GetGameInstance()->GetSubsystem<UScoreSubsystem>())
+	{
+		ScoreSys->TickComboTimer(DeltaTime);
+		ScoreSys->TickSpeedBonus(DeltaTime, MovementComp->GetSpeedNormalized());
+	}
+}
+
+void APowderCharacter::HandleWipeout()
+{
+	if (UScoreSubsystem* ScoreSys = GetGameInstance()->GetSubsystem<UScoreSubsystem>())
+	{
+		ScoreSys->OnWipeout();
+	}
 }
 
 void APowderCharacter::UpdateDioramaCamera(float DeltaTime)
@@ -91,31 +121,26 @@ void APowderCharacter::UpdateDioramaCamera(float DeltaTime)
 
 	float SpeedNorm = MovementComp->GetSpeedNormalized();
 
-	// Arm length: pulls back at speed (900 at rest, 1200 at max speed)
+	// Arm length: pulls back at speed
 	float TargetArmLength = FMath::Lerp(BaseArmLength, MaxArmLength, SpeedNorm);
 	SpringArmComp->TargetArmLength = FMath::FInterpTo(
 		SpringArmComp->TargetArmLength, TargetArmLength, DeltaTime, ArmLengthInterpSpeed);
 
-	// Pitch: lowers at speed to reveal more terrain ahead (-45 at rest, -35 at max)
+	// Camera yaw: blend between downhill and player heading, with interp lag
+	float DownhillYaw = MovementComp->GetSlopeForwardYaw();
+	float PlayerYaw = GetActorRotation().Yaw;
+	float HeadingDelta = FMath::FindDeltaAngleDegrees(DownhillYaw, PlayerYaw);
+	float TargetYaw = DownhillYaw + (HeadingDelta * CameraHeadingFollow) + BaseYawOffset;
+
 	float TargetPitch = FMath::Lerp(BasePitch, SpeedPitch, SpeedNorm);
 
-	// Yaw: base offset + tracks carve direction to preview player's path
-	float CarveAngle = MovementComp->GetCarveAngle();
-	float CarveNorm = CarveAngle / MovementComp->MaxCarveAngle; // -1 to 1
-	float TargetYaw = BaseYawOffset + (CarveNorm * CarveYawInfluence);
-
-	FRotator CurrentRot = SpringArmComp->GetRelativeRotation();
+	// Use world rotation so the spring arm isn't compounded with the capsule's yaw
+	FRotator CurrentRot = SpringArmComp->GetComponentRotation();
 	FRotator TargetRot(TargetPitch, TargetYaw, 0.0f);
+	SpringArmComp->SetWorldRotation(
+		FMath::RInterpTo(CurrentRot, TargetRot, DeltaTime, CameraYawInterpSpeed));
 
-	// Asymmetric interp: slower return-to-center for cinematic feel
-	float CurrentYawAbs = FMath::Abs(CurrentRot.Yaw - BaseYawOffset);
-	float TargetYawAbs = FMath::Abs(TargetYaw - BaseYawOffset);
-	float RotSpeed = (TargetYawAbs < CurrentYawAbs) ? ReturnToFrontSpeed : RotationInterpSpeed;
-
-	SpringArmComp->SetRelativeRotation(
-		FMath::RInterpTo(CurrentRot, TargetRot, DeltaTime, RotSpeed));
-
-	// FOV: subtle widen at speed (60 at rest, 70 at max)
+	// FOV: subtle widen at speed
 	float TargetFOV = FMath::Lerp(BaseFOV, MaxFOV, SpeedNorm);
 	CameraComp->FieldOfView = FMath::FInterpTo(
 		CameraComp->FieldOfView, TargetFOV, DeltaTime, FOVInterpSpeed);
@@ -151,4 +176,68 @@ void APowderCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCom
 UPawnMovementComponent* APowderCharacter::GetMovementComponent() const
 {
 	return MovementComp.Get();
+}
+
+void APowderCharacter::ApplyTuningProfile(const UPowderTuningProfile* Profile)
+{
+	if (!Profile)
+	{
+		return;
+	}
+
+	if (MovementComp)
+	{
+		MovementComp->ApplyTuningProfile(Profile->Movement, Profile->BlendTime);
+	}
+
+	ApplyCameraTuning(Profile->Camera, Profile->BlendTime);
+}
+
+void APowderCharacter::ApplyCameraTuning(const FCameraTuning& Tuning, float BlendTime)
+{
+	// Snapshot current values
+	CameraTuningBlendStart.BaseArmLength = BaseArmLength;
+	CameraTuningBlendStart.MaxArmLength = MaxArmLength;
+	CameraTuningBlendStart.ArmLengthInterpSpeed = ArmLengthInterpSpeed;
+	CameraTuningBlendStart.BasePitch = BasePitch;
+	CameraTuningBlendStart.SpeedPitch = SpeedPitch;
+	CameraTuningBlendStart.BaseYawOffset = BaseYawOffset;
+	CameraTuningBlendStart.CameraHeadingFollow = CameraHeadingFollow;
+	CameraTuningBlendStart.CameraYawInterpSpeed = CameraYawInterpSpeed;
+	CameraTuningBlendStart.BaseFOV = BaseFOV;
+	CameraTuningBlendStart.MaxFOV = MaxFOV;
+	CameraTuningBlendStart.FOVInterpSpeed = FOVInterpSpeed;
+
+	CameraTuningBlendTarget = Tuning;
+	CameraTuningBlendDuration = FMath::Max(BlendTime, KINDA_SMALL_NUMBER);
+	CameraTuningBlendAlpha = 0.0f;
+	bIsBlendingCameraTuning = true;
+}
+
+void APowderCharacter::TickCameraTuningBlend(float DeltaTime)
+{
+	if (!bIsBlendingCameraTuning)
+	{
+		return;
+	}
+
+	CameraTuningBlendAlpha = FMath::Clamp(CameraTuningBlendAlpha + DeltaTime / CameraTuningBlendDuration, 0.0f, 1.0f);
+	float Alpha = CameraTuningBlendAlpha;
+
+	BaseArmLength = FMath::Lerp(CameraTuningBlendStart.BaseArmLength, CameraTuningBlendTarget.BaseArmLength, Alpha);
+	MaxArmLength = FMath::Lerp(CameraTuningBlendStart.MaxArmLength, CameraTuningBlendTarget.MaxArmLength, Alpha);
+	ArmLengthInterpSpeed = FMath::Lerp(CameraTuningBlendStart.ArmLengthInterpSpeed, CameraTuningBlendTarget.ArmLengthInterpSpeed, Alpha);
+	BasePitch = FMath::Lerp(CameraTuningBlendStart.BasePitch, CameraTuningBlendTarget.BasePitch, Alpha);
+	SpeedPitch = FMath::Lerp(CameraTuningBlendStart.SpeedPitch, CameraTuningBlendTarget.SpeedPitch, Alpha);
+	BaseYawOffset = FMath::Lerp(CameraTuningBlendStart.BaseYawOffset, CameraTuningBlendTarget.BaseYawOffset, Alpha);
+	CameraHeadingFollow = FMath::Lerp(CameraTuningBlendStart.CameraHeadingFollow, CameraTuningBlendTarget.CameraHeadingFollow, Alpha);
+	CameraYawInterpSpeed = FMath::Lerp(CameraTuningBlendStart.CameraYawInterpSpeed, CameraTuningBlendTarget.CameraYawInterpSpeed, Alpha);
+	BaseFOV = FMath::Lerp(CameraTuningBlendStart.BaseFOV, CameraTuningBlendTarget.BaseFOV, Alpha);
+	MaxFOV = FMath::Lerp(CameraTuningBlendStart.MaxFOV, CameraTuningBlendTarget.MaxFOV, Alpha);
+	FOVInterpSpeed = FMath::Lerp(CameraTuningBlendStart.FOVInterpSpeed, CameraTuningBlendTarget.FOVInterpSpeed, Alpha);
+
+	if (Alpha >= 1.0f)
+	{
+		bIsBlendingCameraTuning = false;
+	}
 }

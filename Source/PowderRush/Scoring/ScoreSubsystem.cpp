@@ -12,6 +12,7 @@ void UScoreSubsystem::ResetForNewRun()
     CurrentMultiplier = 1.0f;
     ComboTimer = 0.0f;
     CurrentComboChain = 0;
+    MaxSpeedTimer = 0.0f;
 }
 
 void UScoreSubsystem::AddScore(EScoreAction Action, int32 BonusPoints)
@@ -95,6 +96,32 @@ void UScoreSubsystem::TickComboTimer(float DeltaTime)
     }
 }
 
+void UScoreSubsystem::TickSpeedBonus(float DeltaTime, float SpeedNormalized)
+{
+    if (SpeedNormalized >= 0.9f)
+    {
+        MaxSpeedTimer += DeltaTime;
+        if (MaxSpeedTimer >= 3.0f)
+        {
+            AddScore(EScoreAction::SpeedBonus);
+            MaxSpeedTimer = 0.0f;
+        }
+    }
+    else
+    {
+        MaxSpeedTimer = 0.0f;
+    }
+}
+
+void UScoreSubsystem::AwardAirTimeBonus(float AirTime)
+{
+    if (AirTime >= 1.0f)
+    {
+        int32 Bonus = FMath::FloorToInt32(AirTime) * 25;
+        AddScore(EScoreAction::AirTimeBonus, Bonus);
+    }
+}
+
 float UScoreSubsystem::GetComboTimerNormalized() const
 {
     return ComboTimeout > 0.0f ? FMath::Clamp(ComboTimer / ComboTimeout, 0.0f, 1.0f) : 0.0f;
@@ -109,6 +136,8 @@ int32 UScoreSubsystem::GetBasePoints(EScoreAction Action) const
     case EScoreAction::GatePass:    return 25;
     case EScoreAction::TrickLanded: return 100; // BonusPoints adds up to 400 more
     case EScoreAction::BoostBurst:  return 30;
+    case EScoreAction::SpeedBonus:  return 50;
+    case EScoreAction::AirTimeBonus: return 0;  // All via BonusPoints
     default:                        return 0;
     }
 }
@@ -117,10 +146,11 @@ float UScoreSubsystem::GetMultiplierBonus(EScoreAction Action) const
 {
     switch (Action)
     {
-    case EScoreAction::NearMiss:    return 0.5f;
-    case EScoreAction::GatePass:    return 0.2f;
-    case EScoreAction::TrickLanded: return 1.0f;
-    default:                        return 0.0f;
+    case EScoreAction::NearMiss:     return 0.5f;
+    case EScoreAction::GatePass:     return 0.2f;
+    case EScoreAction::TrickLanded:  return 1.0f;
+    case EScoreAction::AirTimeBonus: return 0.2f;
+    default:                         return 0.0f;
     }
 }
 

@@ -5,6 +5,8 @@
 #include "PowderCharacter.generated.h"
 
 class UPowderMovementComponent;
+class UPowderTrickComponent;
+class UPowderTuningProfile;
 class UCapsuleComponent;
 class UStaticMeshComponent;
 class USpringArmComponent;
@@ -27,9 +29,18 @@ public:
 	UPowderMovementComponent* GetPowderMovement() const { return MovementComp; }
 
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Character")
+	UPowderTrickComponent* GetTrickComponent() const { return TrickComp; }
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Character")
 	ERiderType GetRiderType() const { return RiderType; }
 
 	virtual UPawnMovementComponent* GetMovementComponent() const override;
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Tuning")
+	void ApplyTuningProfile(const UPowderTuningProfile* Profile);
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Tuning")
+	void ApplyCameraTuning(const FCameraTuning& Tuning, float BlendTime);
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
@@ -49,6 +60,9 @@ protected:
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
 	TObjectPtr<UPowderMovementComponent> MovementComp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
+	TObjectPtr<UPowderTrickComponent> TrickComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
 	TObjectPtr<UPowderSnowSpray> SnowSprayComp;
@@ -73,7 +87,10 @@ protected:
 	float BaseYawOffset = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float CarveYawInfluence = -5.0f;
+	float CameraHeadingFollow = 0.5f;  // 0.0 = locked downhill, 1.0 = fully follows player heading
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraYawInterpSpeed = 0.5f;  // How slowly camera rotates (low = very laggy)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
 	float BaseFOV = 72.0f;
@@ -85,14 +102,19 @@ protected:
 	float ArmLengthInterpSpeed = 3.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float RotationInterpSpeed = 3.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
-	float ReturnToFrontSpeed = 1.5f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
 	float FOVInterpSpeed = 3.0f;
 
 	void UpdateDioramaCamera(float DeltaTime);
 	void UpdateSnowSpray();
+	void TickCameraTuningBlend(float DeltaTime);
+
+	UFUNCTION()
+	void HandleWipeout();
+
+	// Camera tuning blend state
+	bool bIsBlendingCameraTuning = false;
+	float CameraTuningBlendAlpha = 0.0f;
+	float CameraTuningBlendDuration = 1.0f;
+	FCameraTuning CameraTuningBlendStart;
+	FCameraTuning CameraTuningBlendTarget;
 };

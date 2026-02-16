@@ -8,6 +8,8 @@
 class UInputAction;
 class UInputMappingContext;
 class UPowderMovementComponent;
+class UPowderTrickComponent;
+enum class EPowderGestureDirection : uint8;
 
 UCLASS()
 class POWDERRUSH_API APowderPlayerController : public APlayerController
@@ -37,6 +39,17 @@ protected:
 	float TouchCarveInput = 0.0f;
 	float TouchHoldDuration = 0.0f;
 
+	// Gesture detection state (airborne touch)
+	FVector2D TouchStartPosition = FVector2D::ZeroVector;
+	float TouchStartTime = 0.0f;
+	bool bIsAirborneTouch = false;
+	bool bSecondFingerActive = false;
+	float BothFingersHoldTime = 0.0f;
+
+	float SwipeThreshold = 50.0f;
+	float SwipeTimeWindow = 0.3f;
+	float SpreadEagleHoldThreshold = 0.4f;
+
 	// Keyboard state tracking (desktop testing)
 	bool bKeyboardCarveLeft = false;
 	bool bKeyboardCarveRight = false;
@@ -45,19 +58,28 @@ protected:
 	UPROPERTY()
 	TObjectPtr<UPowderMovementComponent> CachedMovement;
 
+	UPROPERTY()
+	TObjectPtr<UPowderTrickComponent> CachedTrickComp;
+
 	void HandleTouchBegin(ETouchIndex::Type FingerIndex, FVector Location);
 	void HandleTouchEnd(ETouchIndex::Type FingerIndex, FVector Location);
 	void HandleTouchMove(ETouchIndex::Type FingerIndex, FVector Location);
 
 	void ProcessTouchLocation(const FVector& Location);
+	EPowderGestureDirection ClassifySwipe(FVector2D Delta) const;
 
 	// Keyboard handlers for desktop testing
-	void HandleKeyCarveLeftPressed() { bKeyboardCarveLeft = true; KeyboardHoldDuration = 0.0f; }
-	void HandleKeyCarveLeftReleased() { bKeyboardCarveLeft = false; }
-	void HandleKeyCarveRightPressed() { bKeyboardCarveRight = true; KeyboardHoldDuration = 0.0f; }
-	void HandleKeyCarveRightReleased() { bKeyboardCarveRight = false; }
+	void HandleKeyCarveLeftPressed();
+	void HandleKeyCarveLeftReleased();
+	void HandleKeyCarveRightPressed();
+	void HandleKeyCarveRightReleased();
+
+	// Keyboard trick handlers
+	void HandleKeyTrickUp();
+	void HandleKeyTrickDown();
 
 	UPowderMovementComponent* GetMovementComp();
+	UPowderTrickComponent* GetTrickComp();
 
 	void HandleRestart();
 };

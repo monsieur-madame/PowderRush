@@ -1,7 +1,9 @@
 #include "Player/PowderPlayerController.h"
 #include "Player/PowderCharacter.h"
 #include "Player/PowderMovementComponent.h"
+#include "Player/PowderTrickComponent.h"
 #include "Core/PowderGameMode.h"
+#include "Core/PowderTypes.h"
 #include "Engine/World.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputComponent.h"
@@ -49,6 +51,12 @@ void APowderPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Right, IE_Pressed, this, &APowderPlayerController::HandleKeyCarveRightPressed);
 	InputComponent->BindKey(EKeys::Right, IE_Released, this, &APowderPlayerController::HandleKeyCarveRightReleased);
 
+	// Keyboard trick bindings (W/S for backflip/frontflip)
+	InputComponent->BindKey(EKeys::W, IE_Pressed, this, &APowderPlayerController::HandleKeyTrickUp);
+	InputComponent->BindKey(EKeys::S, IE_Pressed, this, &APowderPlayerController::HandleKeyTrickDown);
+	InputComponent->BindKey(EKeys::Up, IE_Pressed, this, &APowderPlayerController::HandleKeyTrickUp);
+	InputComponent->BindKey(EKeys::Down, IE_Pressed, this, &APowderPlayerController::HandleKeyTrickDown);
+
 	// Restart key for desktop testing
 	InputComponent->BindKey(EKeys::R, IE_Pressed, this, &APowderPlayerController::HandleRestart);
 }
@@ -63,10 +71,30 @@ void APowderPlayerController::Tick(float DeltaTime)
 		return;
 	}
 
-	// Determine active carve input: touch takes priority, then keyboard
-	bool bAnyInput = bTouchActive || bKeyboardCarveLeft || bKeyboardCarveRight;
+	bool bAirborne = Movement->IsAirborne();
 
-	if (bTouchActive)
+	// Track SpreadEagle hold (two-finger hold while airborne)
+	if (bAirborne && bTouchActive && bSecondFingerActive)
+	{
+		BothFingersHoldTime += DeltaTime;
+		if (BothFingersHoldTime >= SpreadEagleHoldThreshold)
+		{
+			if (UPowderTrickComponent* TrickComp = GetTrickComp())
+			{
+				TrickComp->RequestTrick(EPowderGestureDirection::HoldBoth);
+			}
+			BothFingersHoldTime = 0.0f;
+		}
+	}
+
+	// Skip carve input while airborne (gestures only)
+	if (bAirborne)
+	{
+		return;
+	}
+
+	// Ground carve input: touch takes priority, then keyboard
+	if (bTouchActive && !bIsAirborneTouch)
 	{
 		TouchHoldDuration += DeltaTime;
 		float Intensity = FMath::Clamp(TouchHoldDuration / 0.25f, 0.4f, 1.0f);
@@ -107,6 +135,18 @@ UPowderMovementComponent* APowderPlayerController::GetMovementComp()
 	return CachedMovement.Get();
 }
 
+UPowderTrickComponent* APowderPlayerController::GetTrickComp()
+{
+	if (!CachedTrickComp)
+	{
+		if (APowderCharacter* PowderChar = Cast<APowderCharacter>(GetPawn()))
+		{
+			CachedTrickComp = PowderChar->GetTrickComponent();
+		}
+	}
+	return CachedTrickComp.Get();
+}
+
 void APowderPlayerController::HandleRestart()
 {
 	if (APowderGameMode* GM = Cast<APowderGameMode>(GetWorld()->GetAuthGameMode()))
@@ -130,6 +170,29 @@ void APowderPlayerController::HandleTouchBegin(ETouchIndex::Type FingerIndex, FV
 		}
 	}
 
+	// Track second finger for SpreadEagle
+	if (FingerIndex != ETouchIndex::Touch1)
+	{
+		bSecondFingerActive = true;
+		BothFingersHoldTime = 0.0f;
+		return;
+	}
+
+	UPowderMovementComponent* Movement = GetMovementComp();
+	bool bAirborne = Movement && Movement->IsAirborne();
+
+	if (bAirborne)
+	{
+		// Record swipe start for gesture detection
+		bIsAirborneTouch = true;
+		TouchStartPosition = FVector2D(Location.X, Location.Y);
+		TouchStartTime = GetWorld()->GetTimeSeconds();
+	}
+	else
+	{
+		bIsAirborneTouch = false;
+	}
+
 	bTouchActive = true;
 	TouchHoldDuration = 0.0f;
 	ProcessTouchLocation(Location);
@@ -137,13 +200,46 @@ void APowderPlayerController::HandleTouchBegin(ETouchIndex::Type FingerIndex, FV
 
 void APowderPlayerController::HandleTouchEnd(ETouchIndex::Type FingerIndex, FVector Location)
 {
+	// Second finger released
+	if (FingerIndex != ETouchIndex::Touch1)
+	{
+		bSecondFingerActive = false;
+		BothFingersHoldTime = 0.0f;
+		return;
+	}
+
+	// If this was an airborne touch, classify the swipe
+	if (bIsAirborneTouch)
+	{
+		FVector2D TouchEndPosition(Location.X, Location.Y);
+		FVector2D SwipeDelta = TouchEndPosition - TouchStartPosition;
+		float ElapsedTime = GetWorld()->GetTimeSeconds() - TouchStartTime;
+
+		if (ElapsedTime <= SwipeTimeWindow && SwipeDelta.Size() >= SwipeThreshold)
+		{
+			EPowderGestureDirection Direction = ClassifySwipe(SwipeDelta);
+			if (Direction != EPowderGestureDirection::None)
+			{
+				if (UPowderTrickComponent* TrickComp = GetTrickComp())
+				{
+					TrickComp->RequestTrick(Direction);
+				}
+			}
+		}
+
+		bIsAirborneTouch = false;
+	}
+
 	bTouchActive = false;
 	TouchHoldDuration = 0.0f;
 }
 
 void APowderPlayerController::HandleTouchMove(ETouchIndex::Type FingerIndex, FVector Location)
 {
-	ProcessTouchLocation(Location);
+	if (!bIsAirborneTouch)
+	{
+		ProcessTouchLocation(Location);
+	}
 }
 
 void APowderPlayerController::ProcessTouchLocation(const FVector& Location)
@@ -154,4 +250,84 @@ void APowderPlayerController::ProcessTouchLocation(const FVector& Location)
 	float ScreenMidX = ViewportSizeX * 0.5f;
 	// Left half = carve left (-1), Right half = carve right (+1)
 	TouchCarveInput = (Location.X < ScreenMidX) ? -1.0f : 1.0f;
+}
+
+EPowderGestureDirection APowderPlayerController::ClassifySwipe(FVector2D Delta) const
+{
+	// Determine dominant axis
+	if (FMath::Abs(Delta.X) > FMath::Abs(Delta.Y))
+	{
+		// Horizontal swipe
+		return (Delta.X < 0.0f) ? EPowderGestureDirection::Left : EPowderGestureDirection::Right;
+	}
+	else
+	{
+		// Vertical swipe (screen Y is inverted: negative = up)
+		return (Delta.Y < 0.0f) ? EPowderGestureDirection::Up : EPowderGestureDirection::Down;
+	}
+}
+
+// Keyboard handlers — route to tricks when airborne, carve when on ground
+void APowderPlayerController::HandleKeyCarveLeftPressed()
+{
+	UPowderMovementComponent* Movement = GetMovementComp();
+	if (Movement && Movement->IsAirborne())
+	{
+		if (UPowderTrickComponent* TrickComp = GetTrickComp())
+		{
+			TrickComp->RequestTrick(EPowderGestureDirection::Left);
+		}
+		return;
+	}
+	bKeyboardCarveLeft = true;
+	KeyboardHoldDuration = 0.0f;
+}
+
+void APowderPlayerController::HandleKeyCarveLeftReleased()
+{
+	bKeyboardCarveLeft = false;
+}
+
+void APowderPlayerController::HandleKeyCarveRightPressed()
+{
+	UPowderMovementComponent* Movement = GetMovementComp();
+	if (Movement && Movement->IsAirborne())
+	{
+		if (UPowderTrickComponent* TrickComp = GetTrickComp())
+		{
+			TrickComp->RequestTrick(EPowderGestureDirection::Right);
+		}
+		return;
+	}
+	bKeyboardCarveRight = true;
+	KeyboardHoldDuration = 0.0f;
+}
+
+void APowderPlayerController::HandleKeyCarveRightReleased()
+{
+	bKeyboardCarveRight = false;
+}
+
+void APowderPlayerController::HandleKeyTrickUp()
+{
+	UPowderMovementComponent* Movement = GetMovementComp();
+	if (Movement && Movement->IsAirborne())
+	{
+		if (UPowderTrickComponent* TrickComp = GetTrickComp())
+		{
+			TrickComp->RequestTrick(EPowderGestureDirection::Up);
+		}
+	}
+}
+
+void APowderPlayerController::HandleKeyTrickDown()
+{
+	UPowderMovementComponent* Movement = GetMovementComp();
+	if (Movement && Movement->IsAirborne())
+	{
+		if (UPowderTrickComponent* TrickComp = GetTrickComp())
+		{
+			TrickComp->RequestTrick(EPowderGestureDirection::Down);
+		}
+	}
 }
