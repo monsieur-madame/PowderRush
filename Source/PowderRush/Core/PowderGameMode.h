@@ -12,6 +12,7 @@ enum class EPowderRunState : uint8
 	InMenu,
 	Starting,
 	Running,
+	Paused,
 	WipedOut,
 	ScoreScreen
 };
@@ -43,6 +44,15 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Game")
 	void OnFinishLineCrossed();
 
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Game")
+	void PauseRun();
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Game")
+	void ResumeRun();
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Game")
+	void QuitToMenu();
+
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Game")
 	EPowderRunState GetRunState() const { return RunState; }
 
@@ -56,6 +66,12 @@ protected:
 	EPowderRunState RunState;
 
 	void SetRunState(EPowderRunState NewState);
+	void RespawnPlayer();
+
+	/** Helper to freeze/unfreeze the player's movement component. */
+	void SetPlayerFrozen(bool bFreeze);
+
+	FTimerHandle WipeoutTimerHandle;
 
 	UPROPERTY()
 	TObjectPtr<APowderEnvironmentSetup> EnvironmentSetup;

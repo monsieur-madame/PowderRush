@@ -92,10 +92,11 @@ void APowderPowerup::Collect(AActor* Collector)
 	UGameInstance* GI = GetGameInstance();
 	UScoreSubsystem* ScoreSys = GI ? GI->GetSubsystem<UScoreSubsystem>() : nullptr;
 
-	// Award collection points
+	// Award collection points and track powerup stat
 	if (ScoreSys)
 	{
 		ScoreSys->AddScore(EScoreAction::PowerupCollected, CollectPoints);
+		ScoreSys->AddPowerupCollected();
 	}
 
 	// Apply effect based on type

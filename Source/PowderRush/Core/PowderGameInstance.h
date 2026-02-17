@@ -4,7 +4,10 @@
 
 #include "CoreMinimal.h"
 #include "Engine/GameInstance.h"
+#include "Meta/PowderSaveGame.h"
 #include "PowderGameInstance.generated.h"
+
+struct FRunStats;
 
 UCLASS()
 class POWDERRUSH_API UPowderGameInstance : public UGameInstance
@@ -32,6 +35,18 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PowderRush")
 	void TrySetHighScore(int32 Score);
 
+	UFUNCTION(BlueprintCallable, Category = "PowderRush")
+	void OnRunCompleted(const FRunStats& RunStats);
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush")
+	const FLifetimeStats& GetLifetimeStats() const { return LifetimeStats; }
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush")
+	void SaveGame();
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush")
+	void LoadGame();
+
 protected:
 	UPROPERTY(BlueprintReadOnly, Category = "PowderRush")
 	int32 TotalCoins = 0;
@@ -41,4 +56,7 @@ protected:
 
 	UPROPERTY(BlueprintReadOnly, Category = "PowderRush")
 	int32 HighScore = 0;
+
+	UPROPERTY(BlueprintReadOnly, Category = "PowderRush")
+	FLifetimeStats LifetimeStats;
 };

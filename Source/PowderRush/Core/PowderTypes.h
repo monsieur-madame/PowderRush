@@ -161,6 +161,24 @@ struct POWDERRUSH_API FMovementTuning
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float BoostDuration = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float OllieForce = 450.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float OllieCooldown = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float CarveInputSmoothing = 5.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float CarveRampTime = 0.6f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float CarveRampMinIntensity = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float CarveRampEaseExponent = 2.0f;
 };
 
 USTRUCT(BlueprintType)

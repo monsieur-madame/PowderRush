@@ -131,11 +131,23 @@ void UScoreSubsystem::TickSpeedBonus(float DeltaTime, float SpeedNormalized)
 
 void UScoreSubsystem::AwardAirTimeBonus(float AirTime)
 {
+    TrackAirTime(AirTime);
+
     if (AirTime >= 1.0f)
     {
         int32 Bonus = FMath::FloorToInt32(AirTime) * 25;
         AddScore(EScoreAction::AirTimeBonus, Bonus);
     }
+}
+
+void UScoreSubsystem::TrackAirTime(float AirTime)
+{
+    CurrentRunStats.LongestAirTime = FMath::Max(CurrentRunStats.LongestAirTime, AirTime);
+}
+
+void UScoreSubsystem::AddPowerupCollected()
+{
+    CurrentRunStats.PowerupsCollected++;
 }
 
 void UScoreSubsystem::ActivatePowerupMultiplier(float Multiplier, float Duration)

@@ -15,7 +15,7 @@ APowderFinishLine::APowderFinishLine()
 
 	TriggerBox = CreateDefaultSubobject<UBoxComponent>(TEXT("TriggerBox"));
 	SetRootComponent(TriggerBox);
-	TriggerBox->SetBoxExtent(FVector(50.0f, 2500.0f, 200.0f));
+	TriggerBox->SetBoxExtent(FVector(100.0f, 2500.0f, 800.0f));
 	TriggerBox->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
 	TriggerBox->SetCollisionObjectType(ECC_WorldStatic);
 	TriggerBox->SetCollisionResponseToAllChannels(ECR_Ignore);
@@ -41,7 +41,7 @@ APowderFinishLine::APowderFinishLine()
 void APowderFinishLine::InitExtent(float SlopeWidth)
 {
 	float HalfWidth = SlopeWidth * 0.5f;
-	TriggerBox->SetBoxExtent(FVector(50.0f, HalfWidth, 200.0f));
+	TriggerBox->SetBoxExtent(FVector(100.0f, HalfWidth, 800.0f));
 	VisualMesh->SetRelativeScale3D(FVector(0.1f, SlopeWidth / 100.0f, 0.3f));
 }
 

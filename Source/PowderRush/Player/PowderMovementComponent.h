@@ -56,10 +56,19 @@ public:
 	void LaunchIntoAir(FVector AdditionalVelocity);
 
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
+	void Ollie();
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
 	void TriggerWipeout();
 
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
 	void ResetMovementState();
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
+	void SetFrozen(bool bFreeze);
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
+	bool IsFrozen() const { return bIsFrozen; }
 
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
 	float GetSlopeForwardYaw() const { return SlopeForward.Rotation().Yaw; }
@@ -134,6 +143,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float TerrainTraceDistance = 500.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float OllieForce = 450.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float OllieCooldown = 1.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarveInputSmoothing = 5.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarveRampTime = 0.6f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarveRampMinIntensity = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarveRampEaseExponent = 2.0f;
+
 	// --- Equipment Stats (applied from equipped gear) ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Equipment")
 	FEquipmentStats EquipmentStats;
@@ -161,9 +188,16 @@ protected:
 	float DesiredYaw = 0.0f;
 	bool bOnGround = false;
 	float SmoothedCarveBleed = 0.0f;
+	float SmoothedCarveInput = 0.0f;
 
 	// Wipeout recovery
 	float WipeoutRecoveryTimer = 0.0f;
+
+	// Ollie cooldown
+	float OllieCooldownTimer = 0.0f;
+
+	// Frozen state (movement disabled during menus/pause/wipeout)
+	bool bIsFrozen = false;
 
 	// Airborne state
 	bool bIsAirborne = false;

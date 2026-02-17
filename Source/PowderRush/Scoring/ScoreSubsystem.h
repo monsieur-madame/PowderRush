@@ -44,6 +44,12 @@ struct POWDERRUSH_API FRunStats
 
     UPROPERTY(BlueprintReadOnly, Category = "PowderRush|Score")
     int32 BestComboChain = 0;
+
+    UPROPERTY(BlueprintReadOnly, Category = "PowderRush|Score")
+    float LongestAirTime = 0.0f;
+
+    UPROPERTY(BlueprintReadOnly, Category = "PowderRush|Score")
+    int32 PowerupsCollected = 0;
 };
 
 UCLASS()
@@ -77,6 +83,12 @@ public:
 
     UFUNCTION(BlueprintCallable, Category = "PowderRush|Score")
     void AwardAirTimeBonus(float AirTime);
+
+    UFUNCTION(BlueprintCallable, Category = "PowderRush|Score")
+    void TrackAirTime(float AirTime);
+
+    UFUNCTION(BlueprintCallable, Category = "PowderRush|Score")
+    void AddPowerupCollected();
 
     UFUNCTION(BlueprintCallable, Category = "PowderRush|Score")
     void ActivatePowerupMultiplier(float Multiplier, float Duration);

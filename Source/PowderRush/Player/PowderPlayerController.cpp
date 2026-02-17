@@ -4,6 +4,7 @@
 #include "Player/PowderTrickComponent.h"
 #include "Core/PowderGameMode.h"
 #include "Core/PowderTypes.h"
+#include "UI/PowderHUD.h"
 #include "Engine/World.h"
 #include "Engine/LocalPlayer.h"
 #include "EnhancedInputComponent.h"
@@ -57,6 +58,12 @@ void APowderPlayerController::SetupInputComponent()
 	InputComponent->BindKey(EKeys::Up, IE_Pressed, this, &APowderPlayerController::HandleKeyTrickUp);
 	InputComponent->BindKey(EKeys::Down, IE_Pressed, this, &APowderPlayerController::HandleKeyTrickDown);
 
+	// Ollie (Space key for desktop testing)
+	InputComponent->BindKey(EKeys::SpaceBar, IE_Pressed, this, &APowderPlayerController::HandleOllie);
+
+	// Pause toggle (Escape)
+	InputComponent->BindKey(EKeys::Escape, IE_Pressed, this, &APowderPlayerController::HandlePauseToggle);
+
 	// Restart key for desktop testing
 	InputComponent->BindKey(EKeys::R, IE_Pressed, this, &APowderPlayerController::HandleRestart);
 }
@@ -64,6 +71,13 @@ void APowderPlayerController::SetupInputComponent()
 void APowderPlayerController::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+
+	// Skip carve processing when not running
+	APowderGameMode* GM = Cast<APowderGameMode>(GetWorld()->GetAuthGameMode());
+	if (GM && GM->GetRunState() != EPowderRunState::Running)
+	{
+		return;
+	}
 
 	UPowderMovementComponent* Movement = GetMovementComp();
 	if (!Movement)
@@ -97,17 +111,21 @@ void APowderPlayerController::Tick(float DeltaTime)
 	if (bTouchActive && !bIsAirborneTouch)
 	{
 		TouchHoldDuration += DeltaTime;
-		float Intensity = FMath::Clamp(TouchHoldDuration / 0.25f, 0.4f, 1.0f);
-		Movement->SetCarveInput(TouchCarveInput * Intensity);
+		float RampAlpha = FMath::Clamp(TouchHoldDuration / Movement->CarveRampTime, 0.0f, 1.0f);
+		float EasedRamp = FMath::Lerp(Movement->CarveRampMinIntensity, 1.0f,
+			FMath::Pow(RampAlpha, Movement->CarveRampEaseExponent));
+		Movement->SetCarveInput(TouchCarveInput * EasedRamp);
 	}
 	else if (bKeyboardCarveLeft || bKeyboardCarveRight)
 	{
 		KeyboardHoldDuration += DeltaTime;
-		float Intensity = FMath::Clamp(KeyboardHoldDuration / 0.25f, 0.4f, 1.0f);
+		float RampAlpha = FMath::Clamp(KeyboardHoldDuration / Movement->CarveRampTime, 0.0f, 1.0f);
+		float EasedRamp = FMath::Lerp(Movement->CarveRampMinIntensity, 1.0f,
+			FMath::Pow(RampAlpha, Movement->CarveRampEaseExponent));
 		float Direction = 0.0f;
 		if (bKeyboardCarveLeft) Direction -= 1.0f;
 		if (bKeyboardCarveRight) Direction += 1.0f;
-		Movement->SetCarveInput(Direction * Intensity);
+		Movement->SetCarveInput(Direction * EasedRamp);
 	}
 	else
 	{
@@ -140,6 +158,11 @@ UPowderTrickComponent* APowderPlayerController::GetTrickComp()
 	return CachedTrickComp.Get();
 }
 
+APowderHUD* APowderPlayerController::GetPowderHUD()
+{
+	return Cast<APowderHUD>(GetHUD());
+}
+
 void APowderPlayerController::HandleRestart()
 {
 	if (APowderGameMode* GM = Cast<APowderGameMode>(GetWorld()->GetAuthGameMode()))
@@ -151,15 +174,54 @@ void APowderPlayerController::HandleRestart()
 	}
 }
 
+void APowderPlayerController::HandlePauseToggle()
+{
+	APowderGameMode* GM = Cast<APowderGameMode>(GetWorld()->GetAuthGameMode());
+	if (!GM)
+	{
+		return;
+	}
+
+	if (GM->GetRunState() == EPowderRunState::Running)
+	{
+		GM->PauseRun();
+	}
+	else if (GM->GetRunState() == EPowderRunState::Paused)
+	{
+		GM->ResumeRun();
+	}
+}
+
 void APowderPlayerController::HandleTouchBegin(ETouchIndex::Type FingerIndex, FVector Location)
 {
-	// During score screen, any tap restarts the run
-	if (APowderGameMode* GM = Cast<APowderGameMode>(GetWorld()->GetAuthGameMode()))
+	APowderGameMode* GM = Cast<APowderGameMode>(GetWorld()->GetAuthGameMode());
+	if (!GM)
 	{
-		if (GM->GetRunState() == EPowderRunState::ScoreScreen)
+		return;
+	}
+
+	EPowderRunState State = GM->GetRunState();
+
+	// Route to menu tap for non-running states
+	if (State == EPowderRunState::InMenu || State == EPowderRunState::Paused || State == EPowderRunState::ScoreScreen)
+	{
+		if (APowderHUD* HUD = GetPowderHUD())
 		{
-			GM->RestartRun();
-			return;
+			HUD->OnMenuTap(Location.X, Location.Y);
+		}
+		return;
+	}
+
+	// During running: check pause button area (top-left)
+	if (State == EPowderRunState::Running)
+	{
+		if (APowderHUD* HUD = GetPowderHUD())
+		{
+			if (HUD->IsPauseAreaHit(Location.X, Location.Y))
+			{
+				GM->PauseRun();
+				return;
+			}
 		}
 	}
 
@@ -184,6 +246,14 @@ void APowderPlayerController::HandleTouchBegin(ETouchIndex::Type FingerIndex, FV
 	else
 	{
 		bIsAirborneTouch = false;
+
+		// Double-tap detection for ollie (grounded only)
+		float Now = GetWorld()->GetTimeSeconds();
+		if (Movement && (Now - LastTapTime) < DoubleTapWindow)
+		{
+			Movement->Ollie();
+		}
+		LastTapTime = Now;
 	}
 
 	bTouchActive = true;
@@ -241,7 +311,6 @@ void APowderPlayerController::ProcessTouchLocation(const FVector& Location)
 	GetViewportSize(ViewportSizeX, ViewportSizeY);
 
 	float ScreenMidX = ViewportSizeX * 0.5f;
-	// Left half = carve left (-1), Right half = carve right (+1)
 	TouchCarveInput = (Location.X < ScreenMidX) ? -1.0f : 1.0f;
 }
 
@@ -322,5 +391,13 @@ void APowderPlayerController::HandleKeyTrickDown()
 		{
 			TrickComp->RequestTrick(EPowderGestureDirection::Down);
 		}
+	}
+}
+
+void APowderPlayerController::HandleOllie()
+{
+	if (UPowderMovementComponent* Movement = GetMovementComp())
+	{
+		Movement->Ollie();
 	}
 }

@@ -55,7 +55,7 @@ UPowderTrickComponent::UPowderTrickComponent()
 		Trick.RequiredGesture = EPowderGestureDirection::HoldBoth;
 		Trick.BasePoints = 200;
 		Trick.Duration = 0.8f;
-		Trick.SpinRotation = FRotator::ZeroRotator;
+		Trick.SpinRotation = FRotator(0.0f, 0.0f, 30.0f);
 		Trick.DisplayName = FName(TEXT("SPREAD EAGLE"));
 		TrickDefinitions.Add(Trick);
 	}
@@ -94,7 +94,11 @@ void UPowderTrickComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		float Alpha = FMath::Clamp(TrickTimer / TrickDuration, 0.0f, 1.0f);
 		// Ease in-out for smoother look
 		float EasedAlpha = FMath::InterpEaseInOut(0.0f, 1.0f, Alpha, 2.0f);
-		FRotator CurrentTrickRot = FMath::Lerp(TrickStartRotation, TrickTargetRotation, EasedAlpha);
+		// Component-wise Lerp to preserve full 360° rotations (FRotator::Lerp normalizes to [-180,180])
+		FRotator CurrentTrickRot;
+		CurrentTrickRot.Pitch = FMath::Lerp(TrickStartRotation.Pitch, TrickTargetRotation.Pitch, EasedAlpha);
+		CurrentTrickRot.Yaw = FMath::Lerp(TrickStartRotation.Yaw, TrickTargetRotation.Yaw, EasedAlpha);
+		CurrentTrickRot.Roll = FMath::Lerp(TrickStartRotation.Roll, TrickTargetRotation.Roll, EasedAlpha);
 		CachedBodyMesh->SetRelativeRotation(CurrentTrickRot);
 	}
 

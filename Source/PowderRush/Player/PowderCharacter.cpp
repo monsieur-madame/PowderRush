@@ -11,6 +11,7 @@
 #include "Camera/CameraComponent.h"
 #include "Effects/PowderSnowSpray.h"
 #include "Core/PowderTuningProfile.h"
+#include "Core/PowderGameMode.h"
 
 APowderCharacter::APowderCharacter()
 {
@@ -115,6 +116,12 @@ void APowderCharacter::HandleWipeout()
 	if (UScoreSubsystem* ScoreSys = GetGameInstance()->GetSubsystem<UScoreSubsystem>())
 	{
 		ScoreSys->OnWipeout();
+	}
+
+	// Notify GameMode for crash/respawn flow
+	if (APowderGameMode* GM = Cast<APowderGameMode>(GetWorld()->GetAuthGameMode()))
+	{
+		GM->OnWipeout();
 	}
 }
 

@@ -54,14 +54,18 @@ PowderRush/
 - Mesh LODs required for all visible assets
 
 ### Key Classes
-- `APowderGameMode` - Main game mode, run lifecycle
-- `APowderCharacter` - Player character (ski/snowboard)
-- `UPowderMovementComponent` - Custom physics-based movement (CORE SYSTEM)
-- `APowderPlayerController` - Touch input handling
-- `UPowderGameInstance` - Persistent game state
-- `UScoreSubsystem` - Scoring and combo tracking (Game Instance Subsystem)
-- `ATerrainManager` - Zone tile loading and stitching
-- `APowderCameraManager` - Dynamic camera with speed-based effects
+- `APowderGameMode` - Main game mode, run lifecycle (state machine: InMenu→Starting→Running→Paused/WipedOut→ScoreScreen)
+- `APowderCharacter` - Player character with Skier mesh, diorama camera, snow spray
+- `UPowderMovementComponent` - Custom physics-based movement (CORE SYSTEM), freeze support, ollie, tuning profile blending
+- `APowderPlayerController` - Touch + keyboard input, binary left/right carve with ease-in ramp, gesture tricks, double-tap ollie
+- `UPowderGameInstance` - Persistent game state, save/load via UPowderSaveGame, lifetime stats
+- `UScoreSubsystem` - Scoring, combo tracking, run stats (Game Instance Subsystem)
+- `UPowderTrickComponent` - Trick system (flips, spins, spread eagle) with mesh rotation
+- `UPowderSaveGame` - Save game with FLifetimeStats (best-of + cumulative)
+- `APowderHUD` - Canvas-based HUD with button hit-testing, menus (main/pause/stats/score), gameplay overlay
+- `APowderEnvironmentSetup` - Spawns slope, lighting, sky, fog, trees, rocks
+- `APowderFinishLine` - Finish line trigger (tall box to catch airborne players)
+- `APowderPowerup` - Speed boost + score multiplier pickups
 
 ### Build Targets
 - **Editor**: Development builds for iteration
@@ -72,9 +76,27 @@ PowderRush/
 - Engine API docs: `/Users/toto/Documents/Epic Games/UE_5.7/Engine/Documentation/Source`
 
 ## Current Phase
-Phase 1: Prototype Core Feel - Make skiing feel amazing on a simple slope.
+Phase 2 complete. Core loop works: menus, skiing, tricks, ollie, powerups, crash/respawn, save system, score screen.
+
+## Game State Machine
+`EPowderRunState`: InMenu → Starting → Running → (Paused | WipedOut → respawn → Running | finish → ScoreScreen) → InMenu
+- Player is frozen (movement disabled) in all non-Running states
+- Crash/wipeout: freeze → 1.5s delay → respawn at slope start → resume Running (run continues, score preserved)
+- Pause/Resume freezes/unfreezes movement component
+
+## Input Design
+- **Touch**: Binary left/right (screen halves), ease-in ramp over CarveRampTime. Double-tap for ollie. Swipe gestures for airborne tricks. Two-finger hold for SpreadEagle.
+- **Keyboard**: A/D or arrows for carve, W/S for tricks, Space for ollie, Escape for pause, R for restart.
+- User preference: binary touch over analog — do not change to analog distance-from-center.
+
+## Tuning System
+- `FMovementTuning` struct in `PowderTypes.h` — all movement params are data-driven
+- `UPowderTuningProfile` data asset with `FMovementTuning` + `FCameraTuning` + BlendTime
+- Default profile loaded via ConstructorHelpers in PowderCharacter constructor
+- `ApplyTuningProfile()` smoothly blends between tuning sets over time
 
 ## Important Notes
 - The game lives or dies on how the skiing FEELS. Movement component is the #1 priority.
 - Test on device early and often - desktop feel != mobile feel.
 - Keep draw calls low, keep materials simple, keep meshes low-poly.
+- FRotator Lerp normalizes to [-180,180] — use component-wise float Lerp for 360° rotations (see PowderTrickComponent).

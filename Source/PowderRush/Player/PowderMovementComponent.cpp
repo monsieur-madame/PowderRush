@@ -20,7 +20,7 @@ void UPowderMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 {
 	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
 
-	if (!UpdatedComponent || ShouldSkipUpdate(DeltaTime))
+	if (!UpdatedComponent || ShouldSkipUpdate(DeltaTime) || bIsFrozen)
 	{
 		return;
 	}
@@ -126,7 +126,10 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 
 void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 {
-	float TargetAngle = CarveInput * MaxCarveAngle;
+	// Smooth raw input for less jittery carving
+	SmoothedCarveInput = FMath::FInterpTo(SmoothedCarveInput, CarveInput, DeltaTime, CarveInputSmoothing);
+
+	float TargetAngle = SmoothedCarveInput * MaxCarveAngle;
 	float InterpSpeed = CarveRate;
 
 	// Use separate (slower) return rate when releasing input
@@ -143,6 +146,11 @@ void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 
 void UPowderMovementComponent::UpdateSpeed(float DeltaTime)
 {
+	if (OllieCooldownTimer > 0.0f)
+	{
+		OllieCooldownTimer -= DeltaTime;
+	}
+
 	if (WipeoutRecoveryTimer > 0.0f)
 	{
 		WipeoutRecoveryTimer -= DeltaTime;
@@ -250,7 +258,30 @@ void UPowderMovementComponent::ResetMovementState()
 	BoostTimer = 0.0f;
 	DesiredYaw = 0.0f;
 	SmoothedCarveBleed = 0.0f;
+	SmoothedCarveInput = 0.0f;
+	OllieCooldownTimer = 0.0f;
 	Velocity = FVector::ZeroVector;
+}
+
+void UPowderMovementComponent::SetFrozen(bool bFreeze)
+{
+	bIsFrozen = bFreeze;
+	if (bIsFrozen)
+	{
+		Velocity = FVector::ZeroVector;
+		CurrentSpeed = 0.0f;
+	}
+}
+
+void UPowderMovementComponent::Ollie()
+{
+	if (bIsAirborne || OllieCooldownTimer > 0.0f)
+	{
+		return;
+	}
+
+	LaunchIntoAir(FVector(0.0f, 0.0f, OllieForce));
+	OllieCooldownTimer = OllieCooldown;
 }
 
 void UPowderMovementComponent::LaunchIntoAir(FVector AdditionalVelocity)
@@ -321,6 +352,12 @@ void UPowderMovementComponent::ApplyTuningProfile(const FMovementTuning& Tuning,
 	TuningBlendStart.BoostFillRate = BoostFillRate;
 	TuningBlendStart.BoostBurstSpeed = BoostBurstSpeed;
 	TuningBlendStart.BoostDuration = BoostDuration;
+	TuningBlendStart.OllieForce = OllieForce;
+	TuningBlendStart.OllieCooldown = OllieCooldown;
+	TuningBlendStart.CarveInputSmoothing = CarveInputSmoothing;
+	TuningBlendStart.CarveRampTime = CarveRampTime;
+	TuningBlendStart.CarveRampMinIntensity = CarveRampMinIntensity;
+	TuningBlendStart.CarveRampEaseExponent = CarveRampEaseExponent;
 
 	TuningBlendTarget = Tuning;
 	TuningBlendDuration = FMath::Max(BlendTime, KINDA_SMALL_NUMBER);
@@ -352,6 +389,12 @@ void UPowderMovementComponent::TickTuningBlend(float DeltaTime)
 	BoostFillRate = FMath::Lerp(TuningBlendStart.BoostFillRate, TuningBlendTarget.BoostFillRate, Alpha);
 	BoostBurstSpeed = FMath::Lerp(TuningBlendStart.BoostBurstSpeed, TuningBlendTarget.BoostBurstSpeed, Alpha);
 	BoostDuration = FMath::Lerp(TuningBlendStart.BoostDuration, TuningBlendTarget.BoostDuration, Alpha);
+	OllieForce = FMath::Lerp(TuningBlendStart.OllieForce, TuningBlendTarget.OllieForce, Alpha);
+	OllieCooldown = FMath::Lerp(TuningBlendStart.OllieCooldown, TuningBlendTarget.OllieCooldown, Alpha);
+	CarveInputSmoothing = FMath::Lerp(TuningBlendStart.CarveInputSmoothing, TuningBlendTarget.CarveInputSmoothing, Alpha);
+	CarveRampTime = FMath::Lerp(TuningBlendStart.CarveRampTime, TuningBlendTarget.CarveRampTime, Alpha);
+	CarveRampMinIntensity = FMath::Lerp(TuningBlendStart.CarveRampMinIntensity, TuningBlendTarget.CarveRampMinIntensity, Alpha);
+	CarveRampEaseExponent = FMath::Lerp(TuningBlendStart.CarveRampEaseExponent, TuningBlendTarget.CarveRampEaseExponent, Alpha);
 
 	if (Alpha >= 1.0f)
 	{

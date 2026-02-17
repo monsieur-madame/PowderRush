@@ -9,6 +9,7 @@ class UInputAction;
 class UInputMappingContext;
 class UPowderMovementComponent;
 class UPowderTrickComponent;
+class APowderHUD;
 enum class EPowderGestureDirection : uint8;
 
 UCLASS()
@@ -78,8 +79,17 @@ protected:
 	void HandleKeyTrickUp();
 	void HandleKeyTrickDown();
 
+	// Ollie (manual jump)
+	void HandleOllie();
+	float LastTapTime = 0.0f;
+	float DoubleTapWindow = 0.3f;
+
+	// Pause toggle
+	void HandlePauseToggle();
+
 	UPowderMovementComponent* GetMovementComp();
 	UPowderTrickComponent* GetTrickComp();
+	APowderHUD* GetPowderHUD();
 
 	void HandleRestart();
 };
