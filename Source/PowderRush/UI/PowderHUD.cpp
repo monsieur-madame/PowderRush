@@ -1,6 +1,8 @@
 #include "UI/PowderHUD.h"
+#include "Player/PowderCharacter.h"
 #include "Player/PowderMovementComponent.h"
 #include "Player/PowderTrickComponent.h"
+#include "Core/PowderTuningProfile.h"
 #include "Scoring/ScoreSubsystem.h"
 #include "Core/PowderGameMode.h"
 #include "Core/PowderGameInstance.h"
@@ -94,6 +96,21 @@ FName APowderHUD::TestButtonHit(float X, float Y) const
 	return NAME_None;
 }
 
+FVector2D APowderHUD::ViewportToCanvas(float X, float Y) const
+{
+	if (CachedCanvasW <= 0.0f)
+	{
+		return FVector2D(X, Y);
+	}
+	int32 VPW, VPH;
+	GetOwningPlayerController()->GetViewportSize(VPW, VPH);
+	if (VPW <= 0 || VPH <= 0)
+	{
+		return FVector2D(X, Y);
+	}
+	return FVector2D(X * CachedCanvasW / VPW, Y * CachedCanvasH / VPH);
+}
+
 void APowderHUD::DrawButton(const FString& Label, FVector2D Pos, FVector2D Size, FColor TextColor, FLinearColor BgColor)
 {
 	DrawRect(BgColor, Pos.X, Pos.Y, Size.X, Size.Y);
@@ -108,7 +125,8 @@ void APowderHUD::DrawButton(const FString& Label, FVector2D Pos, FVector2D Size,
 
 bool APowderHUD::OnMenuTap(float X, float Y)
 {
-	FName Action = TestButtonHit(X, Y);
+	FVector2D CanvasPos = ViewportToCanvas(X, Y);
+	FName Action = TestButtonHit(CanvasPos.X, CanvasPos.Y);
 	if (Action == NAME_None)
 	{
 		return false;
@@ -123,6 +141,7 @@ bool APowderHUD::OnMenuTap(float X, float Y)
 	if (Action == FName(TEXT("Play")))
 	{
 		bShowingStats = false;
+		bShowingDevMenu = false;
 		GM->RestartRun();
 	}
 	else if (Action == FName(TEXT("Stats")))
@@ -135,14 +154,17 @@ bool APowderHUD::OnMenuTap(float X, float Y)
 	}
 	else if (Action == FName(TEXT("Resume")))
 	{
+		bShowingDevMenu = false;
 		GM->ResumeRun();
 	}
 	else if (Action == FName(TEXT("Restart")))
 	{
+		bShowingDevMenu = false;
 		GM->RestartRun();
 	}
 	else if (Action == FName(TEXT("QuitToMenu")))
 	{
+		bShowingDevMenu = false;
 		GM->QuitToMenu();
 	}
 	else if (Action == FName(TEXT("ScoreMenu")))
@@ -153,13 +175,57 @@ bool APowderHUD::OnMenuTap(float X, float Y)
 	{
 		GM->RestartRun();
 	}
+	else if (Action == FName(TEXT("DevMenu")))
+	{
+		bShowingDevMenu = true;
+		DevMenuScrollOffset = 0;
+		BuildDevParamList();
+	}
+	else if (Action == FName(TEXT("DevBack")))
+	{
+		bShowingDevMenu = false;
+	}
+	else if (Action == FName(TEXT("DevUp")))
+	{
+		DevMenuScrollOffset = FMath::Max(0, DevMenuScrollOffset - 1);
+	}
+	else if (Action == FName(TEXT("DevDown")))
+	{
+		DevMenuScrollOffset = FMath::Min(DevMenuScrollOffset + 1, FMath::Max(0, DevParams.Num() - 8));
+	}
+	else if (Action == FName(TEXT("DevReset")))
+	{
+		APowderCharacter* Char = Cast<APowderCharacter>(GetOwningPawn());
+		if (Char && Char->DefaultTuningProfile)
+		{
+			Char->ApplyTuningProfile(Char->DefaultTuningProfile);
+			BuildDevParamList();
+		}
+	}
+	else
+	{
+		// Dev_Inc_N / Dev_Dec_N
+		FString ActionStr = Action.ToString();
+		if (ActionStr.StartsWith(TEXT("Dev_Inc_")) || ActionStr.StartsWith(TEXT("Dev_Dec_")))
+		{
+			bool bInc = ActionStr.StartsWith(TEXT("Dev_Inc_"));
+			FString IndexStr = ActionStr.RightChop(8);
+			int32 Idx = FCString::Atoi(*IndexStr);
+			if (DevParams.IsValidIndex(Idx) && DevParams[Idx].ValuePtr)
+			{
+				float Delta = bInc ? DevParams[Idx].Step : -DevParams[Idx].Step;
+				*DevParams[Idx].ValuePtr = FMath::Clamp(*DevParams[Idx].ValuePtr + Delta, DevParams[Idx].Min, DevParams[Idx].Max);
+			}
+		}
+	}
 
 	return true;
 }
 
 bool APowderHUD::IsPauseAreaHit(float X, float Y) const
 {
-	return X <= 80.0f && Y <= 80.0f;
+	FVector2D CanvasPos = ViewportToCanvas(X, Y);
+	return CanvasPos.X <= 80.0f && CanvasPos.Y <= 80.0f;
 }
 
 // --- DrawHUD ---
@@ -172,6 +238,9 @@ void APowderHUD::DrawHUD()
 	{
 		return;
 	}
+
+	CachedCanvasW = Canvas->SizeX;
+	CachedCanvasH = Canvas->SizeY;
 
 	float DeltaTime = GetWorld()->GetDeltaSeconds();
 
@@ -206,7 +275,11 @@ void APowderHUD::DrawHUD()
 	switch (GM->GetRunState())
 	{
 	case EPowderRunState::InMenu:
-		if (bShowingStats)
+		if (bShowingDevMenu)
+		{
+			DrawDevMenu();
+		}
+		else if (bShowingStats)
 		{
 			DrawStatsScreen();
 		}
@@ -218,7 +291,14 @@ void APowderHUD::DrawHUD()
 
 	case EPowderRunState::Paused:
 		DrawGameplayHUD(DeltaTime);
-		DrawPauseMenu();
+		if (bShowingDevMenu)
+		{
+			DrawDevMenu();
+		}
+		else
+		{
+			DrawPauseMenu();
+		}
 		break;
 
 	case EPowderRunState::ScoreScreen:
@@ -280,6 +360,12 @@ void APowderHUD::DrawMainMenu()
 			DrawText(HighScoreText, FColor(255, 220, 80), CenterX - HSW * 0.5f, StatsY + BtnSize.Y + 30.0f);
 		}
 	}
+
+	// DEV button (bottom-right)
+	FVector2D DevSize(80.0f, 40.0f);
+	FVector2D DevPos(Canvas->SizeX - DevSize.X - 15.0f, Canvas->SizeY - DevSize.Y - 15.0f);
+	DrawButton(TEXT("DEV"), DevPos, DevSize, FColor(200, 200, 200), FLinearColor(0.3f, 0.3f, 0.3f, 0.7f));
+	AddButton(TEXT("DEV"), DevPos, DevSize, FName(TEXT("DevMenu")));
 }
 
 // --- Pause Menu ---
@@ -316,6 +402,12 @@ void APowderHUD::DrawPauseMenu()
 	FVector2D QuitPos(BtnX, BtnY + (BtnSize.Y + Gap) * 2.0f);
 	DrawButton(TEXT("QUIT TO MENU"), QuitPos, BtnSize, FColor::White, FLinearColor(0.5f, 0.15f, 0.1f, 0.9f));
 	AddButton(TEXT("QUIT TO MENU"), QuitPos, BtnSize, FName(TEXT("QuitToMenu")));
+
+	// DEV button (bottom-right)
+	FVector2D DevSize(80.0f, 40.0f);
+	FVector2D DevPos(Canvas->SizeX - DevSize.X - 15.0f, Canvas->SizeY - DevSize.Y - 15.0f);
+	DrawButton(TEXT("DEV"), DevPos, DevSize, FColor(200, 200, 200), FLinearColor(0.3f, 0.3f, 0.3f, 0.7f));
+	AddButton(TEXT("DEV"), DevPos, DevSize, FName(TEXT("DevMenu")));
 }
 
 // --- Stats Screen ---
@@ -648,4 +740,202 @@ void APowderHUD::DrawGameplayHUD(float DeltaTime)
 		Y += Gap;
 		DrawText(TEXT("AIRBORNE"), FColor(80, 255, 80), Padding, Y);
 	}
+}
+
+// --- Dev Tuning Menu ---
+
+void APowderHUD::BuildDevParamList()
+{
+	DevParams.Empty();
+
+	APowderCharacter* Char = Cast<APowderCharacter>(GetOwningPawn());
+	if (!Char)
+	{
+		return;
+	}
+
+	UPowderMovementComponent* MC = Char->GetPowderMovement();
+	if (!MC)
+	{
+		return;
+	}
+
+	// Helper to add a param with a category header marker (Label starting with "--")
+	auto Add = [&](const FString& Label, float* Ptr, float Step, float Min, float Max)
+	{
+		FDevTuningParam P;
+		P.Label = Label;
+		P.ValuePtr = Ptr;
+		P.Step = Step;
+		P.Min = Min;
+		P.Max = Max;
+		DevParams.Add(P);
+	};
+
+	// Category header (ValuePtr = nullptr signals a header row)
+	auto AddHeader = [&](const FString& Label)
+	{
+		FDevTuningParam P;
+		P.Label = Label;
+		P.ValuePtr = nullptr;
+		P.Step = 0.0f;
+		P.Min = 0.0f;
+		P.Max = 0.0f;
+		DevParams.Add(P);
+	};
+
+	// -- Movement params --
+	AddHeader(TEXT("-- Movement --"));
+	Add(TEXT("GravityAccel"),      &MC->GravityAcceleration,  50.0f,   100.0f,  5000.0f);
+	Add(TEXT("SlopeAngle"),        &MC->SlopeAngle,           1.0f,    0.0f,    60.0f);
+	Add(TEXT("MaxSpeed"),          &MC->MaxSpeed,             50.0f,   500.0f,  10000.0f);
+	Add(TEXT("BaseFriction"),      &MC->BaseFriction,         0.005f,  0.0f,    0.5f);
+	Add(TEXT("CarveSpeedBleed"),   &MC->CarveSpeedBleed,      0.05f,   0.0f,    5.0f);
+	Add(TEXT("CarveBleedSmooth"),  &MC->CarveBleedSmoothing,  0.05f,   0.0f,    10.0f);
+	Add(TEXT("CarveRate"),         &MC->CarveRate,            0.05f,   0.0f,    5.0f);
+	Add(TEXT("CarveReturnRate"),   &MC->CarveReturnRate,      0.05f,   0.0f,    5.0f);
+	Add(TEXT("MaxCarveAngle"),     &MC->MaxCarveAngle,        1.0f,    10.0f,   180.0f);
+	Add(TEXT("YawRate"),           &MC->YawRate,              1.0f,    10.0f,   360.0f);
+	Add(TEXT("CarveLateralSpd"),   &MC->CarveLateralSpeed,    50.0f,   0.0f,    5000.0f);
+	Add(TEXT("BoostFillRate"),     &MC->BoostFillRate,        0.05f,   0.0f,    5.0f);
+	Add(TEXT("BoostBurstSpeed"),   &MC->BoostBurstSpeed,      50.0f,   0.0f,    5000.0f);
+	Add(TEXT("BoostDuration"),     &MC->BoostDuration,        0.05f,   0.0f,    5.0f);
+	Add(TEXT("OllieForce"),        &MC->OllieForce,           50.0f,   0.0f,    3000.0f);
+	Add(TEXT("OllieCooldown"),     &MC->OllieCooldown,        0.05f,   0.0f,    5.0f);
+	Add(TEXT("CarveInputSmooth"),  &MC->CarveInputSmoothing,  0.05f,   0.0f,    20.0f);
+	Add(TEXT("CarveRampTime"),     &MC->CarveRampTime,        0.05f,   0.0f,    3.0f);
+	Add(TEXT("CarveRampMinInt"),   &MC->CarveRampMinIntensity,0.05f,   0.0f,    1.0f);
+	Add(TEXT("CarveRampEaseExp"), &MC->CarveRampEaseExponent, 0.05f,   0.5f,    5.0f);
+	Add(TEXT("SpeedTurnLimit"),  &MC->SpeedTurnLimitFactor,  0.05f,   0.0f,    1.0f);
+	Add(TEXT("MinTurnAtMaxSpd"), &MC->MinTurnAngleAtMaxSpeed,1.0f,    5.0f,    90.0f);
+	Add(TEXT("YawSmoothing"),    &MC->YawSmoothing,          0.01f,   0.0f,    0.5f);
+
+	// -- Camera params --
+	AddHeader(TEXT("-- Camera --"));
+	Add(TEXT("BaseArmLen"),        &Char->BaseArmLength,       50.0f,   200.0f,  5000.0f);
+	Add(TEXT("MaxArmLen"),         &Char->MaxArmLength,        50.0f,   200.0f,  5000.0f);
+	Add(TEXT("ArmLenInterp"),      &Char->ArmLengthInterpSpeed,0.05f,  0.1f,    20.0f);
+	Add(TEXT("BasePitch"),         &Char->BasePitch,           1.0f,    -89.0f,  0.0f);
+	Add(TEXT("SpeedPitch"),        &Char->SpeedPitch,          1.0f,    -89.0f,  0.0f);
+	Add(TEXT("BaseYawOffset"),     &Char->BaseYawOffset,       1.0f,    -90.0f,  90.0f);
+	Add(TEXT("CamHeadingFollow"),  &Char->CameraHeadingFollow, 0.05f,   0.0f,    1.0f);
+	Add(TEXT("CamYawInterp"),      &Char->CameraYawInterpSpeed,0.05f,  0.01f,   10.0f);
+	Add(TEXT("BaseFOV"),           &Char->BaseFOV,             1.0f,    30.0f,   120.0f);
+	Add(TEXT("MaxFOV"),            &Char->MaxFOV,              1.0f,    30.0f,   120.0f);
+	Add(TEXT("FOVInterp"),         &Char->FOVInterpSpeed,      0.05f,   0.1f,    20.0f);
+}
+
+void APowderHUD::DrawDevMenu()
+{
+	// Dark background
+	DrawRect(FLinearColor(0.05f, 0.05f, 0.1f, 0.95f), 0.0f, 0.0f, Canvas->SizeX, Canvas->SizeY);
+
+	float CenterX = Canvas->SizeX * 0.5f;
+	float Y = 20.0f;
+
+	// Title
+	FString Title = TEXT("DEV TUNING");
+	float TitleW, TitleH;
+	GetTextSize(Title, TitleW, TitleH, GEngine->GetLargeFont(), 1.0f);
+	DrawText(Title, FColor(255, 200, 80), CenterX - TitleW * 0.5f, Y, GEngine->GetLargeFont(), 1.0f);
+	Y += TitleH + 15.0f;
+
+	// Param rows
+	const float RowH = 44.0f;
+	const float BtnW = 50.0f;
+	const float BtnH = 40.0f;
+	const float LeftMargin = 20.0f;
+	const float RightMargin = 20.0f;
+	const int32 VisibleRows = 8;
+	const float RowAreaW = Canvas->SizeX - LeftMargin - RightMargin;
+
+	int32 StartIdx = DevMenuScrollOffset;
+	int32 EndIdx = FMath::Min(StartIdx + VisibleRows, DevParams.Num());
+
+	for (int32 i = StartIdx; i < EndIdx; i++)
+	{
+		const FDevTuningParam& P = DevParams[i];
+
+		if (!P.ValuePtr)
+		{
+			// Header row
+			DrawText(P.Label, FColor(180, 220, 255), LeftMargin, Y + 10.0f, GEngine->GetLargeFont(), 1.0f);
+			Y += RowH;
+			continue;
+		}
+
+		float RowY = Y;
+
+		// [-] button
+		FVector2D DecPos(LeftMargin, RowY + 2.0f);
+		FVector2D DecSize(BtnW, BtnH);
+		DrawButton(TEXT("-"), DecPos, DecSize, FColor::White, FLinearColor(0.5f, 0.2f, 0.2f, 0.9f));
+		AddButton(TEXT("-"), DecPos, DecSize, FName(*FString::Printf(TEXT("Dev_Dec_%d"), i)));
+
+		// Label
+		float LabelX = LeftMargin + BtnW + 10.0f;
+		DrawText(P.Label, FColor(200, 200, 200), LabelX, RowY + 12.0f);
+
+		// Value
+		FString ValStr;
+		if (P.Step >= 1.0f)
+		{
+			ValStr = FString::Printf(TEXT("%.0f"), *P.ValuePtr);
+		}
+		else if (P.Step >= 0.01f)
+		{
+			ValStr = FString::Printf(TEXT("%.2f"), *P.ValuePtr);
+		}
+		else
+		{
+			ValStr = FString::Printf(TEXT("%.3f"), *P.ValuePtr);
+		}
+
+		float ValW, ValH;
+		GetTextSize(ValStr, ValW, ValH);
+		float IncX = Canvas->SizeX - RightMargin - BtnW;
+		DrawText(ValStr, FColor::White, IncX - ValW - 10.0f, RowY + 12.0f);
+
+		// [+] button
+		FVector2D IncPos(IncX, RowY + 2.0f);
+		FVector2D IncSize(BtnW, BtnH);
+		DrawButton(TEXT("+"), IncPos, IncSize, FColor::White, FLinearColor(0.2f, 0.5f, 0.2f, 0.9f));
+		AddButton(TEXT("+"), IncPos, IncSize, FName(*FString::Printf(TEXT("Dev_Inc_%d"), i)));
+
+		Y += RowH;
+	}
+
+	// Scroll info
+	FString ScrollInfo = FString::Printf(TEXT("%d-%d / %d"), StartIdx + 1, EndIdx, DevParams.Num());
+	float SIW, SIH;
+	GetTextSize(ScrollInfo, SIW, SIH);
+	DrawText(ScrollInfo, FColor(140, 140, 140), CenterX - SIW * 0.5f, Y + 5.0f);
+
+	// Bottom buttons
+	float BottomY = Canvas->SizeY - 70.0f;
+	float NavBtnW = 80.0f;
+	float NavBtnH = 45.0f;
+	float BottomGap = 15.0f;
+
+	// UP
+	FVector2D UpPos(LeftMargin, BottomY);
+	DrawButton(TEXT("UP"), UpPos, FVector2D(NavBtnW, NavBtnH), FColor::White, FLinearColor(0.25f, 0.25f, 0.35f, 0.9f));
+	AddButton(TEXT("UP"), UpPos, FVector2D(NavBtnW, NavBtnH), FName(TEXT("DevUp")));
+
+	// DOWN
+	FVector2D DownPos(LeftMargin + NavBtnW + BottomGap, BottomY);
+	DrawButton(TEXT("DOWN"), DownPos, FVector2D(NavBtnW, NavBtnH), FColor::White, FLinearColor(0.25f, 0.25f, 0.35f, 0.9f));
+	AddButton(TEXT("DOWN"), DownPos, FVector2D(NavBtnW, NavBtnH), FName(TEXT("DevDown")));
+
+	// RESET
+	float ResetW = 90.0f;
+	FVector2D ResetPos(CenterX - ResetW * 0.5f, BottomY);
+	DrawButton(TEXT("RESET"), ResetPos, FVector2D(ResetW, NavBtnH), FColor::White, FLinearColor(0.5f, 0.4f, 0.1f, 0.9f));
+	AddButton(TEXT("RESET"), ResetPos, FVector2D(ResetW, NavBtnH), FName(TEXT("DevReset")));
+
+	// BACK
+	float BackW = 90.0f;
+	FVector2D BackPos(Canvas->SizeX - RightMargin - BackW, BottomY);
+	DrawButton(TEXT("BACK"), BackPos, FVector2D(BackW, NavBtnH), FColor::White, FLinearColor(0.4f, 0.2f, 0.2f, 0.9f));
+	AddButton(TEXT("BACK"), BackPos, FVector2D(BackW, NavBtnH), FName(TEXT("DevBack")));
 }

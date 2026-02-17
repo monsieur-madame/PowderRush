@@ -130,6 +130,12 @@ void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 	SmoothedCarveInput = FMath::FInterpTo(SmoothedCarveInput, CarveInput, DeltaTime, CarveInputSmoothing);
 
 	float TargetAngle = SmoothedCarveInput * MaxCarveAngle;
+
+	// Speed-dependent turn radius: limit carve angle at high speed
+	float SpeedNorm = GetSpeedNormalized();
+	float SpeedLimitedAngle = FMath::Lerp(MaxCarveAngle, MinTurnAngleAtMaxSpeed, SpeedNorm * SpeedTurnLimitFactor);
+	TargetAngle = FMath::Clamp(TargetAngle, -SpeedLimitedAngle, SpeedLimitedAngle);
+
 	float InterpSpeed = CarveRate;
 
 	// Use separate (slower) return rate when releasing input
@@ -212,13 +218,32 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 	// Project onto slope plane to stay on terrain
 	MoveDirection = FVector::VectorPlaneProject(MoveDirection, SlopeNormal).GetSafeNormal();
 	FVector TotalMovement = MoveDirection * EffectiveSpeed * DeltaTime;
+
+	// Lateral drift/slide during carves
+	if (CarveLateralSpeed > 0.0f && FMath::Abs(CurrentCarveAngle) > 1.0f)
+	{
+		FVector RightVector = FVector::CrossProduct(SlopeNormal, MoveDirection).GetSafeNormal();
+		float CarveNorm = CurrentCarveAngle / MaxCarveAngle;
+		TotalMovement += RightVector * CarveNorm * CarveLateralSpeed * DeltaTime;
+	}
+
 	Velocity = TotalMovement / DeltaTime;
+
+	// Visual yaw smoothing: movement uses DesiredYaw, visual rotation can lag behind
+	if (YawSmoothing > 0.0f)
+	{
+		VisualYaw = FMath::FInterpTo(VisualYaw, DesiredYaw, DeltaTime, 1.0f / YawSmoothing);
+	}
+	else
+	{
+		VisualYaw = DesiredYaw;
+	}
 
 	// Rotate capsule to face heading — Yaw only
 	FRotator DesiredRotation = UpdatedComponent->GetComponentRotation();
 	DesiredRotation.Pitch = 0.0f;
 	DesiredRotation.Roll = 0.0f;
-	DesiredRotation.Yaw = DesiredYaw;
+	DesiredRotation.Yaw = VisualYaw;
 
 	FHitResult Hit;
 	UpdatedComponent->MoveComponent(TotalMovement, DesiredRotation, true, &Hit);
@@ -259,6 +284,7 @@ void UPowderMovementComponent::ResetMovementState()
 	DesiredYaw = 0.0f;
 	SmoothedCarveBleed = 0.0f;
 	SmoothedCarveInput = 0.0f;
+	VisualYaw = 0.0f;
 	OllieCooldownTimer = 0.0f;
 	Velocity = FVector::ZeroVector;
 }
@@ -358,6 +384,9 @@ void UPowderMovementComponent::ApplyTuningProfile(const FMovementTuning& Tuning,
 	TuningBlendStart.CarveRampTime = CarveRampTime;
 	TuningBlendStart.CarveRampMinIntensity = CarveRampMinIntensity;
 	TuningBlendStart.CarveRampEaseExponent = CarveRampEaseExponent;
+	TuningBlendStart.SpeedTurnLimitFactor = SpeedTurnLimitFactor;
+	TuningBlendStart.MinTurnAngleAtMaxSpeed = MinTurnAngleAtMaxSpeed;
+	TuningBlendStart.YawSmoothing = YawSmoothing;
 
 	TuningBlendTarget = Tuning;
 	TuningBlendDuration = FMath::Max(BlendTime, KINDA_SMALL_NUMBER);
@@ -395,6 +424,9 @@ void UPowderMovementComponent::TickTuningBlend(float DeltaTime)
 	CarveRampTime = FMath::Lerp(TuningBlendStart.CarveRampTime, TuningBlendTarget.CarveRampTime, Alpha);
 	CarveRampMinIntensity = FMath::Lerp(TuningBlendStart.CarveRampMinIntensity, TuningBlendTarget.CarveRampMinIntensity, Alpha);
 	CarveRampEaseExponent = FMath::Lerp(TuningBlendStart.CarveRampEaseExponent, TuningBlendTarget.CarveRampEaseExponent, Alpha);
+	SpeedTurnLimitFactor = FMath::Lerp(TuningBlendStart.SpeedTurnLimitFactor, TuningBlendTarget.SpeedTurnLimitFactor, Alpha);
+	MinTurnAngleAtMaxSpeed = FMath::Lerp(TuningBlendStart.MinTurnAngleAtMaxSpeed, TuningBlendTarget.MinTurnAngleAtMaxSpeed, Alpha);
+	YawSmoothing = FMath::Lerp(TuningBlendStart.YawSmoothing, TuningBlendTarget.YawSmoothing, Alpha);
 
 	if (Alpha >= 1.0f)
 	{

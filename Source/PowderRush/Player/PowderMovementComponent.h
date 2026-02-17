@@ -161,6 +161,15 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float CarveRampEaseExponent = 2.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float SpeedTurnLimitFactor = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float MinTurnAngleAtMaxSpeed = 30.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float YawSmoothing = 0.0f;
+
 	// --- Equipment Stats (applied from equipped gear) ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Equipment")
 	FEquipmentStats EquipmentStats;
@@ -189,6 +198,7 @@ protected:
 	bool bOnGround = false;
 	float SmoothedCarveBleed = 0.0f;
 	float SmoothedCarveInput = 0.0f;
+	float VisualYaw = 0.0f;
 
 	// Wipeout recovery
 	float WipeoutRecoveryTimer = 0.0f;

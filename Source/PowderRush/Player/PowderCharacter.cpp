@@ -12,6 +12,7 @@
 #include "Effects/PowderSnowSpray.h"
 #include "Core/PowderTuningProfile.h"
 #include "Core/PowderGameMode.h"
+#include "Engine/World.h"
 
 APowderCharacter::APowderCharacter()
 {
@@ -52,7 +53,7 @@ APowderCharacter::APowderCharacter()
 	CameraComp->SetupAttachment(SpringArmComp);
 	CameraComp->FieldOfView = 60.0f;
 
-	// Snow spray (mesh-based particle system)
+	// Snow spray (Niagara particle system)
 	SnowSprayComp = CreateDefaultSubobject<UPowderSnowSpray>(TEXT("SnowSpray"));
 	SnowSprayComp->SetupAttachment(CapsuleComp);
 	SnowSprayComp->SetRelativeLocation(FVector(0.0f, 0.0f, -80.0f));
@@ -167,7 +168,7 @@ void APowderCharacter::UpdateSnowSpray()
 	}
 
 	bool bShouldSpray = MovementComp->IsCarving() &&
-		MovementComp->GetCurrentSpeed() > MovementComp->MaxSpeed * 0.15f;
+		MovementComp->GetCurrentSpeed() > MovementComp->MaxSpeed * 0.05f;
 
 	if (bShouldSpray)
 	{

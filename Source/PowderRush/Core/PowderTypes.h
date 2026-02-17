@@ -179,6 +179,15 @@ struct POWDERRUSH_API FMovementTuning
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CarveRampEaseExponent = 2.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float SpeedTurnLimitFactor = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float MinTurnAngleAtMaxSpeed = 30.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float YawSmoothing = 0.0f;
 };
 
 USTRUCT(BlueprintType)
