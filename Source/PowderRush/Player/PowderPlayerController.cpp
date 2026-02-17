@@ -108,29 +108,92 @@ void APowderPlayerController::Tick(float DeltaTime)
 	}
 
 	// Ground carve input: touch takes priority, then keyboard
+	bool bHasRequestedInput = false;
+	float RequestedInput = 0.0f;
+
 	if (bTouchActive && !bIsAirborneTouch)
 	{
 		TouchHoldDuration += DeltaTime;
-		float RampAlpha = FMath::Clamp(TouchHoldDuration / Movement->CarveRampTime, 0.0f, 1.0f);
-		float EasedRamp = FMath::Lerp(Movement->CarveRampMinIntensity, 1.0f,
+		const float RampAlpha = FMath::Clamp(TouchHoldDuration / Movement->CarveRampTime, 0.0f, 1.0f);
+		const float EasedRamp = FMath::Lerp(
+			Movement->CarveRampMinIntensity,
+			1.0f,
 			FMath::Pow(RampAlpha, Movement->CarveRampEaseExponent));
-		Movement->SetCarveInput(TouchCarveInput * EasedRamp);
+		RequestedInput = TouchCarveInput * EasedRamp;
+		bHasRequestedInput = true;
+		KeyboardHoldDuration = 0.0f;
 	}
 	else if (bKeyboardCarveLeft || bKeyboardCarveRight)
 	{
 		KeyboardHoldDuration += DeltaTime;
-		float RampAlpha = FMath::Clamp(KeyboardHoldDuration / Movement->CarveRampTime, 0.0f, 1.0f);
-		float EasedRamp = FMath::Lerp(Movement->CarveRampMinIntensity, 1.0f,
+		const float RampAlpha = FMath::Clamp(KeyboardHoldDuration / Movement->CarveRampTime, 0.0f, 1.0f);
+		const float EasedRamp = FMath::Lerp(
+			Movement->CarveRampMinIntensity,
+			1.0f,
 			FMath::Pow(RampAlpha, Movement->CarveRampEaseExponent));
 		float Direction = 0.0f;
-		if (bKeyboardCarveLeft) Direction -= 1.0f;
-		if (bKeyboardCarveRight) Direction += 1.0f;
-		Movement->SetCarveInput(Direction * EasedRamp);
+		if (bKeyboardCarveLeft)
+		{
+			Direction -= 1.0f;
+		}
+		if (bKeyboardCarveRight)
+		{
+			Direction += 1.0f;
+		}
+		RequestedInput = Direction * EasedRamp;
+		bHasRequestedInput = true;
 	}
 	else
 	{
-		Movement->ReleaseCarve();
 		KeyboardHoldDuration = 0.0f;
+	}
+
+	CarveSideSwitchCooldownTimer = FMath::Max(0.0f, CarveSideSwitchCooldownTimer - DeltaTime);
+
+	if (bHasRequestedInput)
+	{
+		const float RequestedSign = FMath::Sign(RequestedInput);
+		if (RequestedSign != 0.0f && LastRequestedCarveSign != 0.0f && RequestedSign != LastRequestedCarveSign)
+		{
+			CarveSideSwitchCooldownTimer = FMath::Max(CarveSideSwitchCooldownTimer, CarveSideSwitchCooldown);
+		}
+		LastRequestedCarveSign = RequestedSign;
+		CarveReleaseGraceTimer = CarveReleaseGraceTime;
+
+		float AppliedInput = RequestedInput;
+		if (CarveSideSwitchCooldownTimer > 0.0f && CarveSideSwitchCooldown > KINDA_SMALL_NUMBER)
+		{
+			const float SuppressionAlpha = FMath::Clamp(CarveSideSwitchCooldownTimer / CarveSideSwitchCooldown, 0.0f, 1.0f);
+			const float DampedScale = FMath::Lerp(1.0f, 0.35f, SuppressionAlpha);
+			AppliedInput *= DampedScale;
+		}
+
+		EffectiveCarveInput = AppliedInput;
+		Movement->SetCarveInput(EffectiveCarveInput);
+	}
+	else
+	{
+		LastRequestedCarveSign = 0.0f;
+		if (CarveReleaseGraceTimer > 0.0f)
+		{
+			CarveReleaseGraceTimer = FMath::Max(0.0f, CarveReleaseGraceTimer - DeltaTime);
+			if (CarveReleaseGraceTime > KINDA_SMALL_NUMBER)
+			{
+				const float GraceAlpha = FMath::Clamp(CarveReleaseGraceTimer / CarveReleaseGraceTime, 0.0f, 1.0f);
+				EffectiveCarveInput *= GraceAlpha;
+				Movement->SetCarveInput(EffectiveCarveInput);
+			}
+			else
+			{
+				EffectiveCarveInput = 0.0f;
+				Movement->ReleaseCarve();
+			}
+		}
+		else
+		{
+			EffectiveCarveInput = 0.0f;
+			Movement->ReleaseCarve();
+		}
 	}
 }
 

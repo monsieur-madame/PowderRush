@@ -1,10 +1,20 @@
 #pragma once
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
+#include "Core/PowderTypes.h"
 #include "PowderEnvironmentSetup.generated.h"
 
-class APowderSlopeTile;
+class UDirectionalLightComponent;
+class UExponentialHeightFogComponent;
+class USkyLightComponent;
+class UStaticMeshComponent;
+class UMaterialInstanceDynamic;
+class UPowderWeatherManager;
 
+/**
+ * Spawns global environment elements: lighting, sky dome, fog.
+ * Terrain/obstacle content is authored separately as static level content.
+ */
 UCLASS()
 class POWDERRUSH_API APowderEnvironmentSetup : public AActor
 {
@@ -15,57 +25,42 @@ public:
 
 	virtual void BeginPlay() override;
 
-	/** World position at the top-center of the slope surface */
-	FVector GetSlopeStartPosition() const { return SlopeOrigin; }
-	FVector GetSlopeDownhill() const { return SlopeDownhill; }
-
-	// --- Obstacle Density (per million square units) ---
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Environment|Trees")
-	float BorderTreesPerMillion = 4.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Environment|Trees")
-	float CourseTreesPerMillion = 1.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Environment|Rocks")
-	float BorderRocksPerMillion = 1.5f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Environment|Rocks")
-	float CourseRocksPerMillion = 0.6f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Environment|Jumps")
-	float JumpsPerMillion = 0.4f;
+	/** Editor-time setup: spawns lighting/sky/fog and applies a weather preset without creating a WeatherManager. */
+	void SetupInEditor(EWeatherPreset Preset = EWeatherPreset::ClearDay);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Environment")
-	int32 EnvironmentSeed = 42;
+	bool bReuseExistingSceneLights = true;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Environment")
-	float FinishLinePosition = 0.95f;
+	float DynamicShadowDistance = 8000.0f;
+
+	// Accessors for weather manager
+	UDirectionalLightComponent* GetDirectionalLight() const { return CachedDirLight; }
+	UExponentialHeightFogComponent* GetFogComponent() const { return CachedFog; }
+	USkyLightComponent* GetSkyLight() const { return CachedSkyLight; }
+	UStaticMeshComponent* GetSkyDomeMesh() const { return CachedSkyDome; }
+	UMaterialInstanceDynamic* GetSkyDomeMID() const { return SkyDomeMID; }
+	UPowderWeatherManager* GetWeatherManager() const { return WeatherManager; }
 
 private:
 	void SpawnLighting();
 	void SpawnSkyAndFog();
-	void SpawnBorderTrees(FRandomStream& RNG);
-	void SpawnCourseTrees(FRandomStream& RNG);
-	void SpawnBorderRocks(FRandomStream& RNG);
-	void SpawnCourseRocks(FRandomStream& RNG);
-	void SpawnJumps(FRandomStream& RNG);
-	void SpawnFinishLine();
-	void ApplySlopeMaterial();
 
-	int32 ComputeCountFromDensity(float PerMillion) const;
-	FVector SlopePositionToWorld(float DownhillT, float LateralOffset) const;
-	bool IsTooCloseToExisting(const FVector& Location, const TArray<FVector>& Existing, float MinSpacing) const;
+	UPROPERTY()
+	TObjectPtr<UDirectionalLightComponent> CachedDirLight;
 
-	APowderSlopeTile* FindSlopeTile() const;
+	UPROPERTY()
+	TObjectPtr<UExponentialHeightFogComponent> CachedFog;
 
-	// Cached slope properties
-	FVector SlopeOrigin = FVector::ZeroVector;
-	FVector SlopeDownhill = FVector::ForwardVector;
-	FVector SlopeLateral = FVector::RightVector;
-	float SlopeLength = 10000.0f;
-	float SlopeWidth = 5000.0f;
-	float SlopeAngle = 15.0f;
+	UPROPERTY()
+	TObjectPtr<USkyLightComponent> CachedSkyLight;
 
-	TArray<FVector> PlacedObstacleLocations;
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> CachedSkyDome;
+
+	UPROPERTY()
+	TObjectPtr<UMaterialInstanceDynamic> SkyDomeMID;
+
+	UPROPERTY()
+	TObjectPtr<UPowderWeatherManager> WeatherManager;
 };

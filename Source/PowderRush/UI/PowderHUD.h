@@ -14,6 +14,8 @@ struct FScreenButton
 	FString Label;
 	FVector2D Pos = FVector2D::ZeroVector;
 	FVector2D Size = FVector2D::ZeroVector;
+	FVector2D HitPos = FVector2D::ZeroVector;   // Padded hit rect origin
+	FVector2D HitSize = FVector2D::ZeroVector;  // Padded hit rect size
 	FName Action;
 };
 
@@ -48,9 +50,17 @@ public:
 	float CachedCanvasH = 0.0f;
 	FVector2D ViewportToCanvas(float X, float Y) const;
 
+	// DPI-aware UI scaling
+	float UIScale = 1.0f;
+	float UITouchPadding = 20.0f;
+	/** Scale a raw canvas-pixel value by UIScale */
+	float S(float V) const { return V * UIScale; }
+
 	// Dev tuning menu
 	bool bShowingDevMenu = false;
+	bool bAdvancedDevMenu = false;
 	int32 DevMenuScrollOffset = 0;
+	int32 DevMenuTotalVisible = 80;
 	TArray<FDevTuningParam> DevParams;
 	void BuildDevParamList();
 	void DrawDevMenu();

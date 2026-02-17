@@ -39,6 +39,10 @@ protected:
 	bool bTouchActive = false;
 	float TouchCarveInput = 0.0f;
 	float TouchHoldDuration = 0.0f;
+	float EffectiveCarveInput = 0.0f;
+	float CarveSideSwitchCooldownTimer = 0.0f;
+	float CarveReleaseGraceTimer = 0.0f;
+	float LastRequestedCarveSign = 0.0f;
 
 	// Gesture detection state (airborne touch)
 	FVector2D TouchStartPosition = FVector2D::ZeroVector;
@@ -55,6 +59,12 @@ protected:
 	bool bKeyboardCarveLeft = false;
 	bool bKeyboardCarveRight = false;
 	float KeyboardHoldDuration = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Input|Feel", meta = (ClampMin = "0.0"))
+	float CarveSideSwitchCooldown = 0.08f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Input|Feel", meta = (ClampMin = "0.0"))
+	float CarveReleaseGraceTime = 0.06f;
 
 	UPROPERTY()
 	TObjectPtr<UPowderMovementComponent> CachedMovement;

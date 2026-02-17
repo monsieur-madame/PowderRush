@@ -10,7 +10,7 @@ PowderRush/
     PowderRush.h/.cpp         - Primary game module
     Core/                     - Game mode, game state, game instance
     Player/                   - Character, movement component, controller
-    Terrain/                  - Zone generation, tile system, obstacles
+    Terrain/                  - Authored course path, terrain query service, obstacle actors
     Scoring/                  - Score manager, combo system, near-miss detection
     Pickup/                   - Coins, power-ups, collectibles
     UI/                       - HUD, menus, shop, daily challenges
@@ -62,10 +62,21 @@ PowderRush/
 - `UScoreSubsystem` - Scoring, combo tracking, run stats (Game Instance Subsystem)
 - `UPowderTrickComponent` - Trick system (flips, spins, spread eagle) with mesh rotation
 - `UPowderSaveGame` - Save game with FLifetimeStats (best-of + cumulative)
-- `APowderHUD` - Canvas-based HUD with button hit-testing, menus (main/pause/stats/score), gameplay overlay
-- `APowderEnvironmentSetup` - Spawns slope, lighting, sky, fog, trees, rocks
+- `APowderHUD` - Canvas-based HUD with button hit-testing, menus (main/pause/stats/score), gameplay overlay, single-column dev tuning menu
+- `APowderEnvironmentSetup` - Spawns lighting, sky, fog and weather components
 - `APowderFinishLine` - Finish line trigger (tall box to catch airborne players)
 - `APowderPowerup` - Speed boost + score multiplier pickups
+- `UPowderWeatherManager` - ActorComponent managing weather transitions (lighting, fog, sky, snowfall); lerps between `FWeatherConfig` states
+- `ATerrainManager` - Runtime course query service (reads placed `APowderCoursePath` spline in authored levels)
+- `APowderCoursePath` - Canonical authored spline path for run progression and respawn queries
+- `APowderWeatherVolume` - Placed weather regions with priority/blending for map-authored weather
+- `IPowderAnimInterface` - Animation interface for future skeletal mesh characters (trick anims, carve lean, speed factor)
+
+### Data Assets (optional editor-driven presets — systems use hardcoded defaults without them)
+- `UPowderTuningProfile` - `FMovementTuning` + `FCameraTuning` + BlendTime
+- `UPowderSurfaceProfile` - `FSurfaceProperties` preset (friction, grip, spray, color)
+- `UPowderWeatherProfile` - `FWeatherConfig` preset (sun, fog, snowfall, wind)
+- `UPowderTrickRegistry` - Array of `FPowderTrickDefinition` for data-driven trick definitions
 
 ### Build Targets
 - **Editor**: Development builds for iteration
@@ -76,7 +87,7 @@ PowderRush/
 - Engine API docs: `/Users/toto/Documents/Epic Games/UE_5.7/Engine/Documentation/Source`
 
 ## Current Phase
-Phase 2 complete. Core loop works: menus, skiing, tricks, ollie, powerups, crash/respawn, save system, score screen.
+Phase 3 in progress. Core loop works: menus, skiing, tricks, ollie, powerups, crash/respawn, save system, score screen. Weather volumes, authored spline path workflow, surface/trick data assets, and animation interface scaffolded. Dev menu redesigned (single-column layout).
 
 ## Game State Machine
 `EPowderRunState`: InMenu → Starting → Running → (Paused | WipedOut → respawn → Running | finish → ScoreScreen) → InMenu

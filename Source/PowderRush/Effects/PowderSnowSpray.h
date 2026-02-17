@@ -15,7 +15,7 @@ public:
 	UPowderSnowSpray();
 	virtual void BeginPlay() override;
 
-	void ActivateSpray(float CarveDirection);
+	void ActivateSpray(float CarveDirection, float SprayAmount = 1.0f, FLinearColor SprayColor = FLinearColor::White);
 	void DeactivateSpray();
 	bool IsSprayActive() const { return bIsActive; }
 

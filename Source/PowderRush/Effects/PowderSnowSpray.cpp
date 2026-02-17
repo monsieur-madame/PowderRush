@@ -2,23 +2,21 @@
 #include "NiagaraComponent.h"
 #include "NiagaraSystem.h"
 #include "NiagaraFunctionLibrary.h"
-#include "UObject/ConstructorHelpers.h"
 
 UPowderSnowSpray::UPowderSnowSpray()
 {
 	PrimaryComponentTick.bCanEverTick = false;
-
-	static ConstructorHelpers::FObjectFinder<UNiagaraSystem> SprayAsset(
-		TEXT("/Game/Effects/NS_SnowSpray.NS_SnowSpray"));
-	if (SprayAsset.Succeeded())
-	{
-		SpraySystem = SprayAsset.Object;
-	}
 }
 
 void UPowderSnowSpray::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Deferred load — ConstructorHelpers triggers Niagara serialization too early on iOS
+	if (!SpraySystem)
+	{
+		SpraySystem = LoadObject<UNiagaraSystem>(nullptr, TEXT("/Game/Effects/NS_SnowSpray.NS_SnowSpray"));
+	}
 
 	if (SpraySystem)
 	{
@@ -30,7 +28,7 @@ void UPowderSnowSpray::BeginPlay()
 	}
 }
 
-void UPowderSnowSpray::ActivateSpray(float CarveDirection)
+void UPowderSnowSpray::ActivateSpray(float CarveDirection, float SprayAmount, FLinearColor SprayColor)
 {
 	bIsActive = true;
 	if (NiagaraComp && !NiagaraComp->IsActive())
@@ -40,6 +38,8 @@ void UPowderSnowSpray::ActivateSpray(float CarveDirection)
 	if (NiagaraComp)
 	{
 		NiagaraComp->SetVariableFloat(FName("CarveDirection"), CarveDirection);
+		NiagaraComp->SetVariableFloat(FName("SprayAmount"), SprayAmount);
+		NiagaraComp->SetVariableLinearColor(FName("SprayColor"), SprayColor);
 	}
 }
 

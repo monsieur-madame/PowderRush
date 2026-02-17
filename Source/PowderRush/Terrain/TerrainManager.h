@@ -1,51 +1,24 @@
 #pragma once
+
 #include "CoreMinimal.h"
 #include "GameFramework/Actor.h"
 #include "Core/PowderTypes.h"
+#include "Terrain/PowderSurfaceQueryProvider.h"
 #include "TerrainManager.generated.h"
 
-class ULevelStreamingDynamic;
+class USceneComponent;
+class APowderCoursePath;
 
-USTRUCT(BlueprintType)
-struct FZoneDefinition
+struct FRuntimeSplineSample
 {
-	GENERATED_BODY()
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain")
-	EZoneType ZoneType = EZoneType::PowderBowl;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain")
-	TSoftObjectPtr<UWorld> LevelAsset;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain")
-	float ZoneLength = 20000.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain")
-	float DifficultyRating = 1.0f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain")
-	float BaseWeight = 1.0f;
-};
-
-USTRUCT()
-struct FActiveZone
-{
-	GENERATED_BODY()
-
-	UPROPERTY()
-	int32 ZoneIndex = -1;
-
-	EZoneType ZoneType = EZoneType::PowderBowl;
-	FVector Offset = FVector::ZeroVector;
-	float StartDistance = 0.0f;
-	float EndDistance = 0.0f;
-
-	UPROPERTY()
-	TObjectPtr<ULevelStreamingDynamic> StreamingLevel;
+	float Distance = 0.0f;
+	FVector Position = FVector::ZeroVector;
+	FVector Tangent = FVector::ForwardVector;
+	FVector UpVector = FVector::UpVector;
 };
 
 UCLASS()
-class POWDERRUSH_API ATerrainManager : public AActor
+class POWDERRUSH_API ATerrainManager : public AActor, public IPowderSurfaceQueryProvider
 {
 	GENERATED_BODY()
 
@@ -56,39 +29,104 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Terrain")
-	void ResetTerrain();
+	bool InitializeCourse();
 
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Terrain")
-	void SetPlayerDistance(float Distance);
+	void ResetTerrain();
 
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
-	EZoneType GetCurrentZoneType() const;
+	bool IsCourseInitialized() const { return RuntimeSplineSamples.Num() >= 2; }
 
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
-	ESurfaceType GetSurfaceTypeAtDistance(float Distance) const;
+	float GetPlayerDistance() const { return PlayerDistance; }
 
-protected:
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain")
-	TArray<FZoneDefinition> ZoneDefinitions;
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
+	float GetCourseLength() const { return CachedCourseLength; }
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain")
-	int32 ZonesAhead = 3;
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
+	FVector GetSlopeStartPosition() const;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain")
-	int32 ZonesBehind = 2;
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
+	FVector GetSlopeDownhill() const;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain")
-	float DifficultyEscalationRate = 0.1f;
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
+	FVector GetStartDownhill() const;
 
-	TArray<FActiveZone> ActiveZones;
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
+	FRotator GetStartFacingRotation() const;
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
+	FRotator GetRespawnFacingRotation() const;
+
+	/** Get respawn position slightly uphill from the current progress. */
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
+	FVector GetRespawnPosition() const;
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
+	FVector GetPositionAtDistance(float Distance) const;
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
+	FVector GetDirectionAtDistance(float Distance) const;
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Terrain")
+	float ProjectPositionOntoCourse(const FVector& WorldPos) const;
+
+	virtual bool SampleSurfaceAtWorldPosition(
+		const FVector& WorldPos,
+		FSurfaceProperties& OutSurface,
+		float& OutCourseDistance) const override;
+
+	virtual bool SampleCourseFrameAtWorldPosition(
+		const FVector& WorldPos,
+		FVector& OutTangent,
+		FVector& OutUp,
+		float& OutCourseDistance,
+		float& OutCrossTrackDistance) const override;
+
+	/** Get the surface properties at the player's current course distance. */
+	const FSurfaceProperties* GetCurrentSurfaceProperties() const;
+
+	/** Get the surface properties nearest to an arbitrary course distance. */
+	const FSurfaceProperties* GetSurfacePropertiesAtDistance(float Distance) const;
+
+	const TArray<float>& GetWeatherBreakpointsNormalized() const { return CachedWeatherBreakpointsNormalized; }
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course")
+	bool bAutoInitializeCourseOnBeginPlay = true;
+
+	/** Distance step used when sampling the placed course-path spline. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course", meta = (ClampMin = "100.0"))
+	float CoursePathSampleStep = 500.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course")
+	float StartDistanceOffset = 0.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course")
+	float SpawnHeightOffset = 100.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course")
+	float RespawnBacktrackDistance = 1500.0f;
+
+	/** Additional facing offset applied when converting spline direction to pawn yaw. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course")
+	float SpawnFacingYawOffset = 0.0f;
+
+private:
+	void ClearRuntimeComponents();
+	APowderCoursePath* FindFirstUsableCoursePath() const;
+	bool BuildRuntimeSamplesFromCoursePathSpline(APowderCoursePath* PreferredPath = nullptr);
+	void UpdatePlayerDistance();
+	int32 FindSegmentIndexForDistance(float Distance) const;
+	FVector GetUpVectorAtDistance(float Distance) const;
+	void UpdateProjectionHint(int32 SegmentIndex) const;
+	FRotator BuildFacingRotationFromDirection(const FVector& Direction) const;
+
+	UPROPERTY(Transient)
+	TObjectPtr<USceneComponent> SceneRoot;
+	TArray<FRuntimeSplineSample> RuntimeSplineSamples;
+	TArray<float> CachedWeatherBreakpointsNormalized;
+	float CachedCourseLength = 0.0f;
 	float PlayerDistance = 0.0f;
-	float TotalGeneratedDistance = 0.0f;
-	int32 ZonesGenerated = 0;
-
-	EZoneType SelectNextZoneType();
-	void SpawnZoneAhead();
-	void UnloadZoneBehind();
-	float GetZoneWeight(const FZoneDefinition& Zone) const;
-
-	ESurfaceType GetDefaultSurfaceForZone(EZoneType Type) const;
+	mutable int32 LastProjectedSegmentIndex = INDEX_NONE;
+	FSurfaceProperties DefaultSurfaceProperties;
 };

@@ -76,6 +76,12 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
 	float GetDesiredYaw() const { return DesiredYaw; }
 
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
+	float GetTurnRateDegPerSec() const { return LastTurnRateDegPerSec; }
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
+	float GetGroundNormalStability() const { return GroundNormalStability; }
+
 	// --- Tuning Profile ---
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement|Tuning")
 	void ApplyTuningProfile(const FMovementTuning& Tuning, float BlendTime);
@@ -102,7 +108,14 @@ public:
 	float GravityAcceleration = 980.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	/** Fallback-only angle used when we have no valid terrain normal sample. */
 	float SlopeAngle = 15.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float GravityAlongSlopeScale = 0.45f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float MaxAccelerationSlopeAngle = 28.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float MaxSpeed = 3000.0f;
@@ -141,7 +154,11 @@ public:
 	float BoostDuration = 0.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float TerrainTraceDistance = 500.0f;
+	float TerrainTraceDistance = 1000.0f;
+
+	/** Vertical offset applied after terrain trace snap. Negative values reduce visible hovering. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float TerrainContactOffset = -6.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float OllieForce = 450.0f;
@@ -170,6 +187,27 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float YawSmoothing = 0.0f;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float SlopeForwardInterpSpeed = 10.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CourseHeadingBlend = 0.85f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float MinGroundNormalZ = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float GroundNormalFilterSpeed = 12.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float DownhillAlignRate = 55.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float TurnRateLimitDegPerSec = 220.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarveBleedExponent = 1.8f;
+
 	// --- Equipment Stats (applied from equipped gear) ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Equipment")
 	FEquipmentStats EquipmentStats;
@@ -178,6 +216,9 @@ public:
 	UPROPERTY(BlueprintReadOnly, Category = "PowderRush|Movement")
 	FSurfaceProperties CurrentSurface;
 
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
+	void SetCurrentSurface(const FSurfaceProperties& NewSurface);
+
 protected:
 	void UpdateTerrainFollowing(float DeltaTime);
 	void UpdateCarving(float DeltaTime);
@@ -185,6 +226,9 @@ protected:
 	void UpdateBoost(float DeltaTime);
 	void ApplyMovement(float DeltaTime);
 	void UpdateAirborne(float DeltaTime);
+	bool TraceForTaggedTerrain(const FVector& Start, const FVector& End, FHitResult& OutTerrainHit) const;
+	class IPowderSurfaceQueryProvider* ResolveSurfaceQueryProvider(float DeltaTime);
+	float GetOwnerCapsuleHalfHeight() const;
 
 	float CarveInput = 0.0f;
 	float CurrentCarveAngle = 0.0f;
@@ -199,6 +243,8 @@ protected:
 	float SmoothedCarveBleed = 0.0f;
 	float SmoothedCarveInput = 0.0f;
 	float VisualYaw = 0.0f;
+	float LastTurnRateDegPerSec = 0.0f;
+	float GroundNormalStability = 1.0f;
 
 	// Wipeout recovery
 	float WipeoutRecoveryTimer = 0.0f;
@@ -214,6 +260,14 @@ protected:
 	FVector AirborneVelocity = FVector::ZeroVector;
 	float AirborneTimer = 0.0f;
 
+	// Surface blend state
+	void TickSurfaceBlend(float DeltaTime);
+	bool bIsBlendingSurface = false;
+	float SurfaceBlendAlpha = 0.0f;
+	float SurfaceBlendDuration = 0.5f;
+	FSurfaceProperties SurfaceBlendStart;
+	FSurfaceProperties SurfaceBlendTarget;
+
 	// Tuning blend state
 	void TickTuningBlend(float DeltaTime);
 	bool bIsBlendingTuning = false;
@@ -221,4 +275,7 @@ protected:
 	float TuningBlendDuration = 1.0f;
 	FMovementTuning TuningBlendTarget;
 	FMovementTuning TuningBlendStart;
+
+	TWeakObjectPtr<UObject> CachedSurfaceProviderObject;
+	float SurfaceProviderRetryTimer = 0.0f;
 };
