@@ -62,6 +62,14 @@ APowderCharacter::APowderCharacter()
 
 	// Trick system
 	TrickComp = CreateDefaultSubobject<UPowderTrickComponent>(TEXT("TrickComponent"));
+
+	// Load default tuning profile
+	static ConstructorHelpers::FObjectFinder<UPowderTuningProfile> DefaultProfile(
+		TEXT("/Game/TP_DefaultTuningProfile.TP_DefaultTuningProfile"));
+	if (DefaultProfile.Succeeded())
+	{
+		DefaultTuningProfile = DefaultProfile.Object;
+	}
 }
 
 void APowderCharacter::BeginPlay()
@@ -72,6 +80,17 @@ void APowderCharacter::BeginPlay()
 	if (MovementComp)
 	{
 		MovementComp->OnWipeout.AddDynamic(this, &APowderCharacter::HandleWipeout);
+	}
+
+	// Apply default tuning profile immediately (BlendTime=0 for instant apply on spawn)
+	if (DefaultTuningProfile)
+	{
+		// Apply movement values directly (no blend on startup)
+		if (MovementComp)
+		{
+			MovementComp->ApplyTuningProfile(DefaultTuningProfile->Movement, 0.0f);
+		}
+		ApplyCameraTuning(DefaultTuningProfile->Camera, 0.0f);
 	}
 }
 

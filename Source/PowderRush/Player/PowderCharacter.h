@@ -67,6 +67,9 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Character")
 	ERiderType RiderType = ERiderType::Snowboarder;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	TObjectPtr<UPowderTuningProfile> DefaultTuningProfile;
+
 	// --- Camera Tuning (Three-Quarter Diorama) ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
 	float BaseArmLength = 1400.0f;
