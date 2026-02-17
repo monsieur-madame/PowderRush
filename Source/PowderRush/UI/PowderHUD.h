@@ -17,6 +17,15 @@ struct FScreenButton
 	FName Action;
 };
 
+struct FDevTuningParam
+{
+	FString Label;
+	float* ValuePtr;
+	float Step;
+	float Min;
+	float Max;
+};
+
 UCLASS()
 class POWDERRUSH_API APowderHUD : public AHUD
 {
@@ -33,6 +42,18 @@ public:
 
 	/** Check if tap is in the pause button region (top-left). */
 	bool IsPauseAreaHit(float X, float Y) const;
+
+	// Viewport-to-canvas coordinate conversion (fixes iOS retina mismatch)
+	float CachedCanvasW = 0.0f;
+	float CachedCanvasH = 0.0f;
+	FVector2D ViewportToCanvas(float X, float Y) const;
+
+	// Dev tuning menu
+	bool bShowingDevMenu = false;
+	int32 DevMenuScrollOffset = 0;
+	TArray<FDevTuningParam> DevParams;
+	void BuildDevParamList();
+	void DrawDevMenu();
 
 protected:
 	// Button system

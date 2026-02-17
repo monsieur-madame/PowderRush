@@ -42,35 +42,7 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Tuning")
 	void ApplyCameraTuning(const FCameraTuning& Tuning, float BlendTime);
 
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UCapsuleComponent> CapsuleComp;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UStaticMeshComponent> MeshComp;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<USpringArmComponent> SpringArmComp;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UCameraComponent> CameraComp;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UPowderMovementComponent> MovementComp;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UPowderTrickComponent> TrickComp;
-
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UPowderSnowSpray> SnowSprayComp;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Character")
-	ERiderType RiderType = ERiderType::Snowboarder;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
-	TObjectPtr<UPowderTuningProfile> DefaultTuningProfile;
-
-	// --- Camera Tuning (Three-Quarter Diorama) ---
+	// --- Camera Tuning (Three-Quarter Diorama) --- public for dev tuning menu
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
 	float BaseArmLength = 1400.0f;
 
@@ -103,6 +75,34 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
 	float FOVInterpSpeed = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	TObjectPtr<UPowderTuningProfile> DefaultTuningProfile;
+
+protected:
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
+	TObjectPtr<UCapsuleComponent> CapsuleComp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
+	TObjectPtr<UStaticMeshComponent> MeshComp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
+	TObjectPtr<USpringArmComponent> SpringArmComp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
+	TObjectPtr<UCameraComponent> CameraComp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
+	TObjectPtr<UPowderMovementComponent> MovementComp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
+	TObjectPtr<UPowderTrickComponent> TrickComp;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
+	TObjectPtr<UPowderSnowSpray> SnowSprayComp;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Character")
+	ERiderType RiderType = ERiderType::Snowboarder;
 
 	void UpdateDioramaCamera(float DeltaTime);
 	void UpdateSnowSpray();
