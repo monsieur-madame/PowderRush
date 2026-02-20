@@ -33,7 +33,6 @@ APowderRock::APowderRock()
 	}
 	float S = BaseSize / 100.0f;
 	RockMesh->SetRelativeScale3D(FVector(S * 1.2f, S * 0.8f, S * 0.6f));
-	RockMesh->SetMaterial(0, PowderMaterialHelper::CreateColorMID(this, FLinearColor(0.4f, 0.4f, 0.42f)));
 
 	// Cluster cubes (hidden by default)
 	auto CreateCluster = [&](const TCHAR* Name) -> UStaticMeshComponent*
@@ -64,6 +63,14 @@ APowderRock::APowderRock()
 		SnowCoverMesh->SetStaticMesh(SphereAsset.Object);
 	}
 	SnowCoverMesh->SetVisibility(false);
+}
+
+void APowderRock::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Default gray material (must be in BeginPlay — CreateColorMID asserts IsInGameThread)
+	RockMesh->SetMaterial(0, PowderMaterialHelper::CreateColorMID(this, FLinearColor(0.4f, 0.4f, 0.42f)));
 }
 
 void APowderRock::RandomizeAppearance(FRandomStream& RNG)

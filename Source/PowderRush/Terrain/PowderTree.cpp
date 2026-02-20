@@ -76,7 +76,14 @@ APowderTree::APowderTree()
 	}
 	SnowCapMesh->SetVisibility(false);
 
-	// Apply default materials
+}
+
+void APowderTree::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Apply default materials (must be in BeginPlay, not constructor — CreateColorMID triggers
+	// renderer scene updates that assert IsInGameThread, which fails on the async loading thread)
 	TrunkMesh->SetMaterial(0, PowderMaterialHelper::CreateColorMID(this, FLinearColor(0.35f, 0.2f, 0.1f)));
 	FoliageMesh->SetMaterial(0, PowderMaterialHelper::CreateColorMID(this, FLinearColor(0.1f, 0.35f, 0.1f)));
 }

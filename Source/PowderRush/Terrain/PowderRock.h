@@ -15,6 +15,8 @@ class POWDERRUSH_API APowderRock : public AActor
 public:
 	APowderRock();
 
+	virtual void BeginPlay() override;
+
 	void RandomizeAppearance(FRandomStream& RNG);
 
 	/** Randomize rock: clusters, snow cover, color variation. */

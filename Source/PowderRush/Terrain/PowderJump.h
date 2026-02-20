@@ -16,6 +16,8 @@ class POWDERRUSH_API APowderJump : public AActor
 public:
 	APowderJump();
 
+	virtual void BeginPlay() override;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain")
 	float RampLength = 400.0f;
 

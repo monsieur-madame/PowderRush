@@ -45,9 +45,6 @@ APowderJump::APowderJump()
 	RampMesh->SetCollisionResponseToAllChannels(ECR_Block);
 	RampMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 
-	// Icy blue material
-	RampMesh->SetMaterial(0, PowderMaterialHelper::CreateColorMID(this, FLinearColor(0.55f, 0.78f, 0.9f)));
-
 	// Launch trigger: matches ramp footprint exactly, rotated to align with ramp surface
 	// Attached to SceneRoot (not RampMesh) so extents are in world-scale units
 	LaunchTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("LaunchTrigger"));
@@ -59,6 +56,14 @@ APowderJump::APowderJump()
 	LaunchTrigger->SetGenerateOverlapEvents(true);
 
 	LaunchTrigger->OnComponentBeginOverlap.AddDynamic(this, &APowderJump::OnLaunchTriggerOverlap);
+}
+
+void APowderJump::BeginPlay()
+{
+	Super::BeginPlay();
+
+	// Icy blue material (must be in BeginPlay — CreateColorMID asserts IsInGameThread)
+	RampMesh->SetMaterial(0, PowderMaterialHelper::CreateColorMID(this, FLinearColor(0.55f, 0.78f, 0.9f)));
 }
 
 void APowderJump::OnLaunchTriggerOverlap(

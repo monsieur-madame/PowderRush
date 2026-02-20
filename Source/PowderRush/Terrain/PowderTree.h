@@ -15,6 +15,8 @@ class POWDERRUSH_API APowderTree : public AActor
 public:
 	APowderTree();
 
+	virtual void BeginPlay() override;
+
 	/** Randomize tree dimensions, foliage layers, snow cap, and colors. */
 	void Randomize(FRandomStream& RNG, const FProceduralTreeParams& Params);
 
