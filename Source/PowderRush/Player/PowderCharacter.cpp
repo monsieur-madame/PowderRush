@@ -58,11 +58,11 @@ APowderCharacter::APowderCharacter()
 	TrickComp = CreateDefaultSubobject<UPowderTrickComponent>(TEXT("TrickComponent"));
 
 	// Load default tuning profile
-	static ConstructorHelpers::FObjectFinder<UPowderTuningProfile> DefaultProfile(
-		TEXT("/Game/TP_DefaultTuningProfile.TP_DefaultTuningProfile"));
-	if (DefaultProfile.Succeeded())
+    static ConstructorHelpers::FObjectFinder<UPowderTuningProfile> FeelPreset01(
+        TEXT("/Game/TuningProfiles/TP_Feel_Flow_01_Base.TP_Feel_Flow_01_Base"));
+	if (FeelPreset01.Succeeded())
 	{
-		DefaultTuningProfile = DefaultProfile.Object;
+		DefaultTuningProfile = FeelPreset01.Object;
 	}
 
 	// C++-only preset ladder wiring (no BP character required).
@@ -75,8 +75,6 @@ APowderCharacter::APowderCharacter()
 		}
 	};
 
-	static ConstructorHelpers::FObjectFinder<UPowderTuningProfile> FeelPreset01(
-		TEXT("/Game/TuningProfiles/TP_Feel_Flow_01_Base.TP_Feel_Flow_01_Base"));
 	static ConstructorHelpers::FObjectFinder<UPowderTuningProfile> FeelPreset02(
 		TEXT("/Game/TuningProfiles/TP_Feel_Flow_02_QuickerTurnIn.TP_Feel_Flow_02_QuickerTurnIn"));
 	static ConstructorHelpers::FObjectFinder<UPowderTuningProfile> FeelPreset03(
