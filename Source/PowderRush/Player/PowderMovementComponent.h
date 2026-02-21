@@ -64,6 +64,10 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
 	void ResetMovementState();
 
+	/** Set initial heading from a world direction (e.g. course tangent at spawn). */
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
+	void InitializeHeading(const FVector& CourseDirection);
+
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
 	void SetFrozen(bool bFreeze);
 
@@ -191,9 +195,6 @@ public:
 	float SlopeForwardInterpSpeed = 10.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CourseHeadingBlend = 0.85f;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float MinGroundNormalZ = 0.2f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
@@ -317,6 +318,7 @@ protected:
 	FVector SlopeNormal = FVector::UpVector;
 	FVector SlopeForward = FVector::ForwardVector;
 	float DesiredYaw = 0.0f;
+	bool bHeadingInitialized = false;
 	bool bOnGround = false;
 	float SmoothedCarveBleed = 0.0f;
 	float SmoothedCarveInput = 0.0f;

@@ -129,11 +129,9 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 			SlopeNormal = RawNormal.IsNearlyZero() ? FVector::UpVector : RawNormal;
 		}
 
-		// Derive downhill direction from gravity projected onto slope — works for any slope orientation
-		const FVector Gravity = FVector(0.0f, 0.0f, -1.0f);
-		const FVector SlopeDownhill = FVector::VectorPlaneProject(Gravity, SlopeNormal).GetSafeNormal();
-		FVector TargetDownhill = SlopeDownhill;
-
+		// Derive downhill direction: course spline tangent is authoritative when available,
+		// gravity projection is fallback only (degenerate on flat terrain).
+		bool bHasCourseDirection = false;
 		if (IPowderSurfaceQueryProvider* SurfaceProvider = ResolveSurfaceQueryProvider(DeltaTime))
 		{
 			FVector CourseTangent = FVector::ForwardVector;
@@ -147,46 +145,39 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 				CourseDistance,
 				CrossTrackDistance))
 			{
-				FVector CourseDownhill = FVector::VectorPlaneProject(CourseTangent.GetSafeNormal(), SlopeNormal).GetSafeNormal();
-				if (CourseDownhill.IsNearlyZero())
+				FVector CourseOnSlope = FVector::VectorPlaneProject(CourseTangent.GetSafeNormal(), SlopeNormal).GetSafeNormal();
+				if (CourseOnSlope.IsNearlyZero())
 				{
-					CourseDownhill = CourseTangent.GetSafeNormal();
+					CourseOnSlope = CourseTangent.GetSafeNormal();
 				}
-
-				if (!CourseDownhill.IsNearlyZero())
+				if (!CourseOnSlope.IsNearlyZero())
 				{
-					if (!SlopeDownhill.IsNearlyZero())
-					{
-						TargetDownhill = FMath::Lerp(
-							SlopeDownhill,
-							CourseDownhill,
-							FMath::Clamp(CourseHeadingBlend, 0.0f, 1.0f)).GetSafeNormal();
-					}
-					else
-					{
-						TargetDownhill = CourseDownhill;
-					}
+					// Direct assignment — no blend, no interp lag
+					SlopeForward = CourseOnSlope;
+					bHasCourseDirection = true;
 				}
 			}
 		}
 
-		// On first ground contact (heading uninitialized), snap slope forward and heading instantly
-		const bool bNeedsHeadingInit = (DesiredYaw == 0.0f);
-
-		if (!TargetDownhill.IsNearlyZero())
+		// Fallback: gravity-downhill when no course is available
+		if (!bHasCourseDirection)
 		{
-			if (bNeedsHeadingInit)
+			const FVector Gravity = FVector(0.0f, 0.0f, -1.0f);
+			const FVector SlopeDownhill = FVector::VectorPlaneProject(Gravity, SlopeNormal).GetSafeNormal();
+			if (!SlopeDownhill.IsNearlyZero())
 			{
-				// Snap immediately — no interp from stale default
-				SlopeForward = TargetDownhill;
-			}
-			else
-			{
-				SlopeForward = FMath::VInterpTo(
-					SlopeForward,
-					TargetDownhill,
-					DeltaTime,
-					FMath::Max(0.0f, SlopeForwardInterpSpeed)).GetSafeNormal();
+				if (!bHeadingInitialized)
+				{
+					SlopeForward = SlopeDownhill;
+				}
+				else
+				{
+					SlopeForward = FMath::VInterpTo(
+						SlopeForward,
+						SlopeDownhill,
+						DeltaTime,
+						FMath::Max(0.0f, SlopeForwardInterpSpeed)).GetSafeNormal();
+				}
 			}
 		}
 
@@ -200,10 +191,11 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 		}
 
 		// Initialize heading from slope on first ground contact
-		if (bNeedsHeadingInit && !SlopeForward.IsNearlyZero())
+		if (!bHeadingInitialized && !SlopeForward.IsNearlyZero())
 		{
 			DesiredYaw = SlopeForward.Rotation().Yaw;
 			VisualYaw = DesiredYaw;
+			bHeadingInitialized = true;
 		}
 
 		if (IPowderSurfaceQueryProvider* SurfaceProvider = ResolveSurfaceQueryProvider(DeltaTime))
@@ -369,6 +361,16 @@ void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 			FMath::Max(0.0f, EffectiveDownhillAlign) * DeltaTime);
 	}
 
+	// Heading-projected speed: project speed onto new heading direction.
+	// Small carves: cos(small angle) ≈ 1 → almost no loss.
+	// Hard 90° carve: cos(90°) = 0 → speed drops to zero.
+	// Trying to go uphill: speed rapidly drains.
+	{
+		float YawDelta = FMath::FindDeltaAngleDegrees(PrevYaw, DesiredYaw);
+		float CosProjection = FMath::Cos(FMath::DegreesToRadians(YawDelta));
+		CurrentSpeed *= FMath::Max(0.0f, CosProjection);
+	}
+
 	LastTurnRateDegPerSec = (DeltaTime > KINDA_SMALL_NUMBER)
 		? FMath::Abs(FMath::FindDeltaAngleDegrees(PrevYaw, DesiredYaw)) / DeltaTime
 		: 0.0f;
@@ -442,6 +444,17 @@ void UPowderMovementComponent::UpdateSpeed(float DeltaTime)
 	float Acceleration = (AdjustedGravityForce - (AdjustedFriction + CarveBleed) * CurrentSpeed) * SpeedMod;
 	CurrentSpeed += Acceleration * DeltaTime;
 	CurrentSpeed = FMath::Clamp(CurrentSpeed, 0.0f, MaxSpeed * SpeedMod);
+
+	// Heading-deviation speed cap: speed cannot exceed what the forward component
+	// along the current heading provides relative to course direction.
+	// cos(0°)=1.0 (full speed), cos(45°)=0.71, cos(90°)=0 (no speed).
+	// This prevents accumulating speed while heading sideways or backwards,
+	// which per-frame cos projection alone doesn't catch for gradual turns.
+	{
+		float HeadingDeviation = FMath::Abs(FMath::FindDeltaAngleDegrees(DownhillYaw, DesiredYaw));
+		float HeadingSpeedCap = MaxSpeed * SpeedMod * FMath::Max(0.0f, FMath::Cos(FMath::DegreesToRadians(HeadingDeviation)));
+		CurrentSpeed = FMath::Min(CurrentSpeed, HeadingSpeedCap);
+	}
 }
 
 void UPowderMovementComponent::UpdateBoost(float DeltaTime)
@@ -477,12 +490,13 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 	MoveDirection = FVector::VectorPlaneProject(MoveDirection, SlopeNormal).GetSafeNormal();
 	FVector TotalMovement = MoveDirection * EffectiveSpeed * DeltaTime;
 
-	// Lateral drift/slide during carves
-	if (CarveLateralSpeed > 0.0f && FMath::Abs(CurrentCarveAngle) > 1.0f)
+	// Lateral drift/slide during carves — scales with forward speed (no drift when stationary)
+	if (CarveLateralSpeed > 0.0f && FMath::Abs(CurrentCarveAngle) > 1.0f && EffectiveSpeed > 1.0f)
 	{
 		FVector RightVector = FVector::CrossProduct(SlopeNormal, MoveDirection).GetSafeNormal();
 		float CarveNorm = CurrentCarveAngle / MaxCarveAngle;
-		TotalMovement += RightVector * CarveNorm * CarveLateralSpeed * DeltaTime;
+		float LateralFactor = FMath::Clamp(EffectiveSpeed / FMath::Max(1.0f, MaxSpeed), 0.0f, 1.0f);
+		TotalMovement += RightVector * CarveNorm * CarveLateralSpeed * LateralFactor * DeltaTime;
 	}
 
 	Velocity = TotalMovement / DeltaTime;
@@ -558,6 +572,7 @@ void UPowderMovementComponent::ResetMovementState()
 	bIsBoosting = false;
 	BoostTimer = 0.0f;
 	DesiredYaw = 0.0f;
+	bHeadingInitialized = false;
 	SmoothedCarveBleed = 0.0f;
 	SmoothedCarveInput = 0.0f;
 	VisualYaw = 0.0f;
@@ -578,6 +593,19 @@ void UPowderMovementComponent::ResetMovementState()
 	Velocity = FVector::ZeroVector;
 	SlopeForward = FVector::ForwardVector;
 	SlopeNormal = FVector::UpVector;
+}
+
+void UPowderMovementComponent::InitializeHeading(const FVector& CourseDirection)
+{
+	FVector Dir = FVector(CourseDirection.X, CourseDirection.Y, 0.0f).GetSafeNormal();
+	if (Dir.IsNearlyZero())
+	{
+		return;
+	}
+	SlopeForward = Dir;
+	DesiredYaw = Dir.Rotation().Yaw;
+	VisualYaw = DesiredYaw;
+	bHeadingInitialized = true;
 }
 
 void UPowderMovementComponent::SetFrozen(bool bFreeze)
@@ -708,12 +736,12 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 		float SpeedPenalty = (1.0f - LandingQuality) * LandingSpeedPenaltyMax;
 		CurrentSpeed = FMath::Clamp(HorizontalSpeed * (1.0f - SpeedPenalty), 0.0f, MaxSpeed);
 
-		// Align heading to airborne velocity so movement direction matches on landing
+		// Align heading to airborne velocity direction.
+		// Speed projection in UpdateCarving naturally prevents wrong-direction travel.
 		if (HorizontalSpeed > 10.0f)
 		{
-			float LandingYaw = HorizontalVel.Rotation().Yaw;
-			DesiredYaw = LandingYaw;
-			VisualYaw = LandingYaw;
+			DesiredYaw = HorizontalVel.Rotation().Yaw;
+			VisualYaw = DesiredYaw;
 		}
 
 		// Set landing control penalty for bad landings

@@ -73,6 +73,11 @@ void APowderGameMode::BeginPlay()
 			FVector StartPos = TerrainManager->GetSlopeStartPosition();
 			FRotator StartRot = TerrainManager->GetStartFacingRotation();
 			PlayerPawn->SetActorLocationAndRotation(StartPos, StartRot);
+
+			if (UPowderMovementComponent* MoveComp = PlayerPawn->FindComponentByClass<UPowderMovementComponent>())
+			{
+				MoveComp->InitializeHeading(TerrainManager->GetStartDownhill());
+			}
 		}
 	}
 
@@ -108,6 +113,11 @@ void APowderGameMode::StartRun()
 		FVector StartPos = TerrainManager->GetSlopeStartPosition();
 		FRotator StartRot = TerrainManager->GetStartFacingRotation();
 		PlayerPawn->SetActorLocationAndRotation(StartPos, StartRot);
+
+		if (UPowderMovementComponent* MoveComp = PlayerPawn->FindComponentByClass<UPowderMovementComponent>())
+		{
+			MoveComp->InitializeHeading(TerrainManager->GetStartDownhill());
+		}
 	}
 
 	// Force clear day at start, then volume blending takes over during Tick.
@@ -164,6 +174,15 @@ void APowderGameMode::RespawnPlayer()
 			FVector RespawnPos = TerrainManager->GetRespawnPosition();
 			FRotator RespawnRot = TerrainManager->GetRespawnFacingRotation();
 			PlayerPawn->SetActorLocationAndRotation(RespawnPos, RespawnRot);
+
+			float RespawnDistance = FMath::Clamp(
+				TerrainManager->GetPlayerDistance() - TerrainManager->RespawnBacktrackDistance,
+				0.0f,
+				TerrainManager->GetCourseLength());
+			if (UPowderMovementComponent* MoveComp = PlayerPawn->FindComponentByClass<UPowderMovementComponent>())
+			{
+				MoveComp->InitializeHeading(TerrainManager->GetDirectionAtDistance(RespawnDistance));
+			}
 		}
 	}
 
@@ -240,6 +259,11 @@ void APowderGameMode::QuitToMenu()
 			FVector StartPos = TerrainManager->GetSlopeStartPosition();
 			FRotator StartRot = TerrainManager->GetStartFacingRotation();
 			PlayerPawn->SetActorLocationAndRotation(StartPos, StartRot);
+
+			if (UPowderMovementComponent* MoveComp = PlayerPawn->FindComponentByClass<UPowderMovementComponent>())
+			{
+				MoveComp->InitializeHeading(TerrainManager->GetStartDownhill());
+			}
 		}
 	}
 
