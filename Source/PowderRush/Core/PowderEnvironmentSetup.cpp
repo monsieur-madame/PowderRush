@@ -1,9 +1,4 @@
 #include "Core/PowderEnvironmentSetup.h"
-#include "Terrain/SlopeTile.h"
-#include "Terrain/PowderTree.h"
-#include "Terrain/PowderRock.h"
-#include "Terrain/PowderJump.h"
-#include "Terrain/PowderFinishLine.h"
 #include "Components/StaticMeshComponent.h"
 #include "Engine/StaticMesh.h"
 #include "Components/DirectionalLightComponent.h"
@@ -14,8 +9,9 @@
 #include "Engine/ExponentialHeightFog.h"
 #include "Materials/MaterialInstanceDynamic.h"
 #include "Effects/PowderMaterialHelper.h"
+#include "Effects/PowderWeatherManager.h"
 #include "Engine/World.h"
-#include "Kismet/GameplayStatics.h"
+#include "EngineUtils.h"
 
 APowderEnvironmentSetup::APowderEnvironmentSetup()
 {
@@ -26,78 +22,52 @@ void APowderEnvironmentSetup::BeginPlay()
 {
 	Super::BeginPlay();
 
-	// Find the slope tile to derive coordinate system
-	APowderSlopeTile* Tile = FindSlopeTile();
-	if (Tile)
-	{
-		SlopeLength = Tile->GetSlopeLength();
-		SlopeWidth = Tile->GetSlopeWidth();
-		SlopeAngle = Tile->GetSlopeAngle();
-
-		// Downhill direction: forward rotated down by slope angle
-		float AngleRad = FMath::DegreesToRadians(SlopeAngle);
-		SlopeDownhill = FVector(FMath::Cos(AngleRad), 0.0f, -FMath::Sin(AngleRad));
-		SlopeLateral = FVector::RightVector;
-
-		// Surface normal points "up" out of the tilted slab
-		FVector SurfaceNormal = FVector(FMath::Sin(AngleRad), 0.0f, FMath::Cos(AngleRad));
-
-		// Offset origin to uphill edge, on top of the slab surface
-		// The cube is 100 units thick (Z scale 1.0), so the surface is 50 units above centerline
-		SlopeOrigin = Tile->GetActorLocation()
-			- SlopeDownhill * (SlopeLength * 0.5f)
-			+ SurfaceNormal * 50.0f;
-	}
-
-	FRandomStream RNG(EnvironmentSeed);
-
 	SpawnLighting();
 	SpawnSkyAndFog();
-	SpawnBorderTrees(RNG);
-	SpawnCourseTrees(RNG);
-	SpawnBorderRocks(RNG);
-	SpawnCourseRocks(RNG);
-	SpawnJumps(RNG);
-	SpawnFinishLine();
-	ApplySlopeMaterial();
-}
 
-APowderSlopeTile* APowderEnvironmentSetup::FindSlopeTile() const
-{
-	TArray<AActor*> Found;
-	UGameplayStatics::GetAllActorsOfClass(GetWorld(), APowderSlopeTile::StaticClass(), Found);
-	if (Found.Num() > 0)
+	// Create weather manager and initialize with cached refs
+	WeatherManager = NewObject<UPowderWeatherManager>(this, TEXT("WeatherManager"));
+	if (WeatherManager)
 	{
-		return Cast<APowderSlopeTile>(Found[0]);
+		WeatherManager->RegisterComponent();
+		WeatherManager->Initialize(CachedDirLight, CachedFog, CachedSkyLight, CachedSkyDome, SkyDomeMID);
 	}
-	return nullptr;
 }
 
-FVector APowderEnvironmentSetup::SlopePositionToWorld(float DownhillT, float LateralOffset) const
+void APowderEnvironmentSetup::SetupInEditor(EWeatherPreset Preset)
 {
-	// DownhillT: 0.0 = top of slope, 1.0 = bottom
-	// LateralOffset: -1.0 = full left, 1.0 = full right (in units of half-width)
-	return SlopeOrigin
-		+ SlopeDownhill * (DownhillT * SlopeLength)
-		+ SlopeLateral * (LateralOffset * SlopeWidth * 0.5f);
-}
+#if WITH_EDITOR
+	SpawnLighting();
+	SpawnSkyAndFog();
 
-int32 APowderEnvironmentSetup::ComputeCountFromDensity(float PerMillion) const
-{
-	float Area = SlopeLength * SlopeWidth;
-	return FMath::Clamp(FMath::RoundToInt(Area * PerMillion / 1000000.0f), 1, 500);
-}
+	const FWeatherConfig Config = UPowderWeatherManager::GetDefaultConfig(Preset);
 
-bool APowderEnvironmentSetup::IsTooCloseToExisting(const FVector& Location, const TArray<FVector>& Existing, float MinSpacing) const
-{
-	for (const FVector& Pos : Existing)
+	if (CachedDirLight)
 	{
-		if (FVector::Dist(Location, Pos) < MinSpacing)
-		{
-			return true;
-		}
+		CachedDirLight->SetIntensity(Config.SunIntensity);
+		CachedDirLight->SetLightColor(Config.SunColor.ToFColor(true));
+		CachedDirLight->SetWorldRotation(Config.SunRotation);
 	}
-	return false;
+
+	if (SkyDomeMID)
+	{
+		SkyDomeMID->SetVectorParameterValue(TEXT("Color"), Config.SkyColor);
+	}
+
+	if (CachedSkyLight)
+	{
+		CachedSkyLight->SetIntensity(Config.SkyLightIntensity);
+		CachedSkyLight->RecaptureSky();
+	}
+
+	if (CachedFog)
+	{
+		CachedFog->SetFogDensity(Config.FogDensity);
+		CachedFog->SetFogInscatteringColor(Config.FogColor);
+		CachedFog->FogHeightFalloff = Config.FogHeightFalloff;
+		CachedFog->SetStartDistance(Config.FogStartDistance);
+	}
+#endif
 }
 
 void APowderEnvironmentSetup::SpawnLighting()
@@ -108,21 +78,46 @@ void APowderEnvironmentSetup::SpawnLighting()
 		return;
 	}
 
+	if (bReuseExistingSceneLights)
+	{
+		for (TActorIterator<ADirectionalLight> It(World); It; ++It)
+		{
+			ADirectionalLight* Existing = *It;
+			if (!Existing)
+			{
+				continue;
+			}
+
+			CachedDirLight = Cast<UDirectionalLightComponent>(Existing->GetLightComponent());
+			if (CachedDirLight)
+			{
+				break;
+			}
+		}
+	}
+
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	ADirectionalLight* DirLight = World->SpawnActor<ADirectionalLight>(
-		FVector::ZeroVector, FRotator(-40.0f, -60.0f, 0.0f), Params);
-	if (DirLight)
+	if (!CachedDirLight)
 	{
-		UDirectionalLightComponent* DirLightComp = Cast<UDirectionalLightComponent>(DirLight->GetLightComponent());
-		if (DirLightComp)
+		ADirectionalLight* DirLight = World->SpawnActor<ADirectionalLight>(
+			FVector::ZeroVector, FRotator(-40.0f, -60.0f, 0.0f), Params);
+		if (DirLight)
 		{
-			DirLightComp->SetAtmosphereSunLight(true);
-			DirLightComp->SetIntensity(4.0f);
-			DirLightComp->SetLightColor(FColor(255, 248, 230));
-			DirLightComp->SetCastShadows(true);
+			DirLight->GetRootComponent()->SetMobility(EComponentMobility::Stationary);
+			CachedDirLight = Cast<UDirectionalLightComponent>(DirLight->GetLightComponent());
 		}
+	}
+
+	if (CachedDirLight)
+	{
+		CachedDirLight->SetAtmosphereSunLight(true);
+		CachedDirLight->SetIntensity(4.0f);
+		CachedDirLight->SetLightColor(FColor(255, 248, 230));
+		CachedDirLight->SetCastShadows(true);
+		CachedDirLight->DynamicShadowDistanceMovableLight = DynamicShadowDistance;
+		CachedDirLight->DynamicShadowDistanceStationaryLight = DynamicShadowDistance;
 	}
 }
 
@@ -137,7 +132,7 @@ void APowderEnvironmentSetup::SpawnSkyAndFog()
 	FActorSpawnParameters Params;
 	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
 
-	// Sky dome — large inverted sphere as reliable sky backdrop
+	// Sky dome
 	AActor* DomeActor = World->SpawnActor<AActor>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
 	if (DomeActor)
 	{
@@ -155,269 +150,73 @@ void APowderEnvironmentSetup::SpawnSkyAndFog()
 		DomeMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
 		DomeMesh->CastShadow = false;
 
-		// Two-sided unlit sky blue material — visible from inside the sphere
-		DomeMesh->SetMaterial(0, PowderMaterialHelper::CreateSkyDomeMID(DomeActor, FLinearColor(0.4f, 0.65f, 0.95f)));
+		SkyDomeMID = PowderMaterialHelper::CreateSkyDomeMID(DomeActor, FLinearColor(0.4f, 0.65f, 0.95f));
+		DomeMesh->SetMaterial(0, SkyDomeMID);
+		CachedSkyDome = DomeMesh;
 	}
 
-	// Sky light for ambient fill
-	ASkyLight* SkyLightActor = World->SpawnActor<ASkyLight>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
-	if (SkyLightActor)
+	if (bReuseExistingSceneLights)
 	{
-		USkyLightComponent* SkyLightComp = SkyLightActor->GetLightComponent();
-		if (SkyLightComp)
+		for (TActorIterator<ASkyLight> It(World); It; ++It)
 		{
-			SkyLightComp->SetIntensity(1.0f);
-			SkyLightComp->bRealTimeCapture = true;
-			SkyLightComp->RecaptureSky();
+			if (ASkyLight* Existing = *It)
+			{
+				CachedSkyLight = Existing->GetLightComponent();
+				if (CachedSkyLight)
+				{
+					break;
+				}
+			}
 		}
 	}
 
-	// Exponential height fog
-	AExponentialHeightFog* FogActor = World->SpawnActor<AExponentialHeightFog>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
-	if (FogActor)
+	if (!CachedSkyLight)
 	{
-		UExponentialHeightFogComponent* FogComp = FogActor->GetComponent();
-		if (FogComp)
+		ASkyLight* SkyLightActor = World->SpawnActor<ASkyLight>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
+		if (SkyLightActor)
 		{
-			FogComp->SetFogDensity(0.002f);
-			FogComp->SetFogInscatteringColor(FLinearColor(0.7f, 0.8f, 0.95f));
-			FogComp->FogHeightFalloff = 0.2f;
-			FogComp->SetStartDistance(2000.0f);
+			SkyLightActor->GetRootComponent()->SetMobility(EComponentMobility::Stationary);
+			CachedSkyLight = SkyLightActor->GetLightComponent();
 		}
 	}
-}
 
-void APowderEnvironmentSetup::SpawnBorderTrees(FRandomStream& RNG)
-{
-	UWorld* World = GetWorld();
-	if (!World)
+	if (CachedSkyLight)
 	{
-		return;
+		CachedSkyLight->SetIntensity(1.0f);
+		CachedSkyLight->bRealTimeCapture = false;
+		CachedSkyLight->RecaptureSky();
 	}
 
-	int32 Count = ComputeCountFromDensity(BorderTreesPerMillion);
-	const float MinSpacing = 300.0f;
-	const float BandStart = 0.7f;
-	const float BandEnd = 1.3f;
-
-	for (int32 i = 0; i < Count; ++i)
+	if (bReuseExistingSceneLights)
 	{
-		float DownhillT = RNG.FRandRange(0.0f, 1.0f);
-		float Side = (RNG.FRand() < 0.5f) ? -1.0f : 1.0f;
-		float LateralT = Side * RNG.FRandRange(BandStart, BandEnd);
-
-		FVector Location = SlopePositionToWorld(DownhillT, LateralT);
-
-		if (IsTooCloseToExisting(Location, PlacedObstacleLocations, MinSpacing))
+		for (TActorIterator<AExponentialHeightFog> It(World); It; ++It)
 		{
-			continue;
-		}
-
-		FActorSpawnParameters Params;
-		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		APowderTree* Tree = World->SpawnActor<APowderTree>(Location, FRotator::ZeroRotator, Params);
-		if (Tree)
-		{
-			float Yaw = RNG.FRandRange(0.0f, 360.0f);
-			Tree->SetActorRotation(FRotator(0.0f, Yaw, 0.0f));
-			float ScaleVar = RNG.FRandRange(0.7f, 1.3f);
-			Tree->SetActorScale3D(FVector(ScaleVar));
-
-			PlacedObstacleLocations.Add(Location);
+			if (AExponentialHeightFog* Existing = *It)
+			{
+				CachedFog = Existing->GetComponent();
+				if (CachedFog)
+				{
+					break;
+				}
+			}
 		}
 	}
-}
 
-void APowderEnvironmentSetup::SpawnCourseTrees(FRandomStream& RNG)
-{
-	UWorld* World = GetWorld();
-	if (!World)
+	if (!CachedFog)
 	{
-		return;
-	}
-
-	int32 Count = ComputeCountFromDensity(CourseTreesPerMillion);
-	const float MinSpacing = 500.0f;
-	const float BandStart = 0.0f;
-	const float BandEnd = 0.5f;
-
-	for (int32 i = 0; i < Count; ++i)
-	{
-		// Avoid top 10% of slope so player start area is clear
-		float DownhillT = RNG.FRandRange(0.1f, 1.0f);
-		float Side = (RNG.FRand() < 0.5f) ? -1.0f : 1.0f;
-		float LateralT = Side * RNG.FRandRange(BandStart, BandEnd);
-
-		FVector Location = SlopePositionToWorld(DownhillT, LateralT);
-
-		if (IsTooCloseToExisting(Location, PlacedObstacleLocations, MinSpacing))
+		AExponentialHeightFog* FogActor = World->SpawnActor<AExponentialHeightFog>(FVector::ZeroVector, FRotator::ZeroRotator, Params);
+		if (FogActor)
 		{
-			continue;
-		}
-
-		FActorSpawnParameters Params;
-		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		APowderTree* Tree = World->SpawnActor<APowderTree>(Location, FRotator::ZeroRotator, Params);
-		if (Tree)
-		{
-			float Yaw = RNG.FRandRange(0.0f, 360.0f);
-			Tree->SetActorRotation(FRotator(0.0f, Yaw, 0.0f));
-			float ScaleVar = RNG.FRandRange(0.6f, 1.1f);
-			Tree->SetActorScale3D(FVector(ScaleVar));
-
-			PlacedObstacleLocations.Add(Location);
+			FogActor->GetRootComponent()->SetMobility(EComponentMobility::Movable);
+			CachedFog = FogActor->GetComponent();
 		}
 	}
-}
 
-void APowderEnvironmentSetup::SpawnBorderRocks(FRandomStream& RNG)
-{
-	UWorld* World = GetWorld();
-	if (!World)
+	if (CachedFog)
 	{
-		return;
+		CachedFog->SetFogDensity(0.002f);
+		CachedFog->SetFogInscatteringColor(FLinearColor(0.7f, 0.8f, 0.95f));
+		CachedFog->FogHeightFalloff = 0.2f;
+		CachedFog->SetStartDistance(2000.0f);
 	}
-
-	int32 Count = ComputeCountFromDensity(BorderRocksPerMillion);
-	const float MinSpacing = 200.0f;
-	const float BandStart = 0.6f;
-	const float BandEnd = 1.1f;
-
-	for (int32 i = 0; i < Count; ++i)
-	{
-		float DownhillT = RNG.FRandRange(0.05f, 0.95f);
-		float Side = (RNG.FRand() < 0.5f) ? -1.0f : 1.0f;
-		float LateralT = Side * RNG.FRandRange(BandStart, BandEnd);
-
-		FVector Location = SlopePositionToWorld(DownhillT, LateralT);
-
-		if (IsTooCloseToExisting(Location, PlacedObstacleLocations, MinSpacing))
-		{
-			continue;
-		}
-
-		FActorSpawnParameters Params;
-		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		APowderRock* Rock = World->SpawnActor<APowderRock>(Location, FRotator::ZeroRotator, Params);
-		if (Rock)
-		{
-			Rock->RandomizeAppearance(RNG);
-			PlacedObstacleLocations.Add(Location);
-		}
-	}
-}
-
-void APowderEnvironmentSetup::SpawnCourseRocks(FRandomStream& RNG)
-{
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	int32 Count = ComputeCountFromDensity(CourseRocksPerMillion);
-	const float MinSpacing = 300.0f;
-	const float BandStart = 0.0f;
-	const float BandEnd = 0.4f;
-
-	for (int32 i = 0; i < Count; ++i)
-	{
-		float DownhillT = RNG.FRandRange(0.1f, 0.95f);
-		float Side = (RNG.FRand() < 0.5f) ? -1.0f : 1.0f;
-		float LateralT = Side * RNG.FRandRange(BandStart, BandEnd);
-
-		FVector Location = SlopePositionToWorld(DownhillT, LateralT);
-
-		if (IsTooCloseToExisting(Location, PlacedObstacleLocations, MinSpacing))
-		{
-			continue;
-		}
-
-		FActorSpawnParameters Params;
-		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		APowderRock* Rock = World->SpawnActor<APowderRock>(Location, FRotator::ZeroRotator, Params);
-		if (Rock)
-		{
-			Rock->RandomizeAppearance(RNG);
-			PlacedObstacleLocations.Add(Location);
-		}
-	}
-}
-
-void APowderEnvironmentSetup::SpawnJumps(FRandomStream& RNG)
-{
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	int32 Count = ComputeCountFromDensity(JumpsPerMillion);
-	const float MinSpacing = 800.0f;
-	const float BandStart = 0.0f;
-	const float BandEnd = 0.3f;
-
-	// Orient ramp facing downhill
-	FRotator RampRotation = SlopeDownhill.Rotation();
-
-	for (int32 i = 0; i < Count; ++i)
-	{
-		// Avoid top 15% of slope
-		float DownhillT = RNG.FRandRange(0.15f, 0.9f);
-		float Side = (RNG.FRand() < 0.5f) ? -1.0f : 1.0f;
-		float LateralT = Side * RNG.FRandRange(BandStart, BandEnd);
-
-		FVector Location = SlopePositionToWorld(DownhillT, LateralT);
-
-		// Check spacing against all obstacles (jumps, trees, rocks)
-		if (IsTooCloseToExisting(Location, PlacedObstacleLocations, MinSpacing))
-		{
-			continue;
-		}
-
-		FActorSpawnParameters Params;
-		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-		APowderJump* Jump = World->SpawnActor<APowderJump>(Location, RampRotation, Params);
-		if (Jump)
-		{
-			PlacedObstacleLocations.Add(Location);
-		}
-	}
-}
-
-void APowderEnvironmentSetup::SpawnFinishLine()
-{
-	UWorld* World = GetWorld();
-	if (!World)
-	{
-		return;
-	}
-
-	FVector Location = SlopePositionToWorld(FinishLinePosition, 0.0f);
-	FRotator Rotation = SlopeDownhill.Rotation();
-
-	FActorSpawnParameters Params;
-	Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
-	APowderFinishLine* FinishLine = World->SpawnActor<APowderFinishLine>(Location, Rotation, Params);
-	if (FinishLine)
-	{
-		FinishLine->InitExtent(SlopeWidth);
-	}
-}
-
-void APowderEnvironmentSetup::ApplySlopeMaterial()
-{
-	APowderSlopeTile* Tile = FindSlopeTile();
-	if (!Tile)
-	{
-		return;
-	}
-
-	UStaticMeshComponent* Mesh = Tile->GetSlopeMesh();
-	if (!Mesh)
-	{
-		return;
-	}
-
-	Mesh->SetMaterial(0, PowderMaterialHelper::CreateColorMID(this, FLinearColor(0.92f, 0.94f, 0.98f)));
 }

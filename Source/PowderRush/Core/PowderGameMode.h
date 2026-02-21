@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PowderTypes.h"
 #include "GameFramework/GameModeBase.h"
 #include "PowderGameMode.generated.h"
 
@@ -18,6 +19,7 @@ enum class EPowderRunState : uint8
 };
 
 class APowderEnvironmentSetup;
+class ATerrainManager;
 
 UCLASS()
 class POWDERRUSH_API APowderGameMode : public AGameModeBase
@@ -27,7 +29,14 @@ class POWDERRUSH_API APowderGameMode : public AGameModeBase
 public:
 	APowderGameMode();
 
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Game")
+	ATerrainManager* GetTerrainManager() const { return TerrainManager; }
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Game")
+	APowderEnvironmentSetup* GetEnvironmentSetup() const { return EnvironmentSetup; }
+
 	virtual void BeginPlay() override;
+	virtual void Tick(float DeltaTime) override;
 
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Game")
 	void StartRun();
@@ -73,6 +82,18 @@ protected:
 
 	FTimerHandle WipeoutTimerHandle;
 
+	void UpdateWeatherFromVolumes();
+	bool AreRequiredActorsReady() const;
+	bool IsWeatherConfigDifferent(const FWeatherConfig& A, const FWeatherConfig& B) const;
+	void ApplyWeatherIfNeeded(const FWeatherConfig& NewConfig);
+
 	UPROPERTY()
 	TObjectPtr<APowderEnvironmentSetup> EnvironmentSetup;
+
+	UPROPERTY()
+	TObjectPtr<ATerrainManager> TerrainManager;
+
+	bool bRequiredActorsReady = false;
+	bool bHasLastAppliedWeather = false;
+	FWeatherConfig LastAppliedWeather;
 };

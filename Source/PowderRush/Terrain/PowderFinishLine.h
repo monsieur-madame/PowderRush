@@ -14,6 +14,8 @@ class POWDERRUSH_API APowderFinishLine : public AActor
 public:
 	APowderFinishLine();
 
+	virtual void BeginPlay() override;
+
 	void InitExtent(float SlopeWidth);
 
 protected:

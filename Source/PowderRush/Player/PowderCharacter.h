@@ -7,7 +7,6 @@
 class UPowderMovementComponent;
 class UPowderTrickComponent;
 class UPowderTuningProfile;
-class UCapsuleComponent;
 class UStaticMeshComponent;
 class USpringArmComponent;
 class UCameraComponent;
@@ -42,6 +41,24 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Tuning")
 	void ApplyCameraTuning(const FCameraTuning& Tuning, float BlendTime);
 
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Tuning|Feel")
+	bool ApplyFeelPresetByIndex(int32 NewIndex, float OverrideBlendTime = -1.0f);
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Tuning|Feel")
+	bool StepFeelPreset(int32 Direction);
+
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Tuning|Feel")
+	bool ToggleLastFeelPreset();
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Tuning|Feel")
+	int32 GetActiveFeelPresetIndex() const { return ActiveFeelPresetIndex; }
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Tuning|Feel")
+	int32 GetPreviousFeelPresetIndex() const { return PreviousFeelPresetIndex; }
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Tuning|Feel")
+	FString GetActiveFeelPresetName() const;
+
 	// --- Camera Tuning (Three-Quarter Diorama) --- public for dev tuning menu
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
 	float BaseArmLength = 1400.0f;
@@ -65,6 +82,15 @@ public:
 	float CameraYawInterpSpeed = 0.5f;  // How slowly camera rotates (low = very laggy)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraTurnLeadWeight = 0.55f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraLookAheadWeight = 0.35f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraLookAheadMaxYaw = 20.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
 	float BaseFOV = 72.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
@@ -79,10 +105,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	TObjectPtr<UPowderTuningProfile> DefaultTuningProfile;
 
-protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UCapsuleComponent> CapsuleComp;
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning|Feel")
+	TArray<TObjectPtr<UPowderTuningProfile>> FeelPresetLadder;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Tuning|Feel")
+	int32 ActiveFeelPresetIndex = INDEX_NONE;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Tuning|Feel")
+	int32 PreviousFeelPresetIndex = INDEX_NONE;
+
+protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 

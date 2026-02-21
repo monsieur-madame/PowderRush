@@ -166,11 +166,8 @@ void UPowderTrickComponent::CompleteTrick()
 	CurrentState = EPowderTrickState::Completed;
 	OnTrickCompleted.Broadcast(ActiveTrickType, ChainedPoints);
 
-	// Reset body mesh rotation to rest pose
-	if (CachedBodyMesh)
-	{
-		CachedBodyMesh->SetRelativeRotation(FRotator::ZeroRotator);
-	}
+	// Reset body mesh rotation to movement-driven heading
+	RestoreBaseRotation();
 
 	// Ready for next trick in chain (stays airborne)
 	ActiveTrickType = EPowderTrickType::None;
@@ -181,11 +178,8 @@ void UPowderTrickComponent::FailTrick()
 	CurrentState = EPowderTrickState::Failed;
 	OnTrickFailed.Broadcast();
 
-	// Reset body mesh
-	if (CachedBodyMesh)
-	{
-		CachedBodyMesh->SetRelativeRotation(FRotator::ZeroRotator);
-	}
+	// Reset body mesh rotation to movement-driven heading
+	RestoreBaseRotation();
 
 	// Trigger wipeout on movement component
 	if (CachedMovement)
@@ -199,7 +193,7 @@ void UPowderTrickComponent::OnBecameAirborne()
 	ResetJumpState();
 }
 
-void UPowderTrickComponent::OnLanded(float AirTime)
+void UPowderTrickComponent::OnLanded(float AirTime, float LandingQuality)
 {
 	// If mid-trick on landing, that's a fail
 	if (CurrentState == EPowderTrickState::Executing)
@@ -256,10 +250,15 @@ void UPowderTrickComponent::ResetJumpState()
 	CurrentJumpTricks.Empty();
 	TotalJumpPoints = 0;
 
-	// Reset body mesh rotation
-	if (CachedBodyMesh)
+	// Reset body mesh rotation to movement-driven heading
+	RestoreBaseRotation();
+}
+
+void UPowderTrickComponent::RestoreBaseRotation()
+{
+	if (CachedBodyMesh && CachedMovement)
 	{
-		CachedBodyMesh->SetRelativeRotation(FRotator::ZeroRotator);
+		CachedBodyMesh->SetWorldRotation(FRotator(0.0f, CachedMovement->GetDesiredYaw(), 0.0f));
 	}
 }
 

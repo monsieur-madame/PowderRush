@@ -5,6 +5,7 @@
 
 class UStaticMeshComponent;
 class USceneComponent;
+struct FProceduralTreeParams;
 
 UCLASS()
 class POWDERRUSH_API APowderTree : public AActor
@@ -13,6 +14,11 @@ class POWDERRUSH_API APowderTree : public AActor
 
 public:
 	APowderTree();
+
+	virtual void BeginPlay() override;
+
+	/** Randomize tree dimensions, foliage layers, snow cap, and colors. */
+	void Randomize(FRandomStream& RNG, const FProceduralTreeParams& Params);
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain")
 	float TrunkHeight = 200.0f;
@@ -33,6 +39,18 @@ protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Terrain")
 	TObjectPtr<UStaticMeshComponent> TrunkMesh;
 
+	/** Primary foliage cone (always visible). */
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Terrain")
 	TObjectPtr<UStaticMeshComponent> FoliageMesh;
+
+	/** Additional foliage layers for fuller look (hidden by default). */
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> FoliageLayer2;
+
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> FoliageLayer3;
+
+	/** Snow cap on top (hidden by default). */
+	UPROPERTY()
+	TObjectPtr<UStaticMeshComponent> SnowCapMesh;
 };

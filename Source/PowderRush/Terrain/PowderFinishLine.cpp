@@ -35,6 +35,12 @@ APowderFinishLine::APowderFinishLine()
 
 	// Thin red banner spanning the slope width
 	VisualMesh->SetRelativeScale3D(FVector(0.1f, 50.0f, 0.3f));
+}
+
+void APowderFinishLine::BeginPlay()
+{
+	Super::BeginPlay();
+
 	VisualMesh->SetMaterial(0, PowderMaterialHelper::CreateColorMID(this, FLinearColor(0.9f, 0.1f, 0.1f)));
 }
 
