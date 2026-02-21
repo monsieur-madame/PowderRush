@@ -170,13 +170,24 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 			}
 		}
 
+		// On first ground contact (heading uninitialized), snap slope forward and heading instantly
+		const bool bNeedsHeadingInit = (DesiredYaw == 0.0f);
+
 		if (!TargetDownhill.IsNearlyZero())
 		{
-			SlopeForward = FMath::VInterpTo(
-				SlopeForward,
-				TargetDownhill,
-				DeltaTime,
-				FMath::Max(0.0f, SlopeForwardInterpSpeed)).GetSafeNormal();
+			if (bNeedsHeadingInit)
+			{
+				// Snap immediately — no interp from stale default
+				SlopeForward = TargetDownhill;
+			}
+			else
+			{
+				SlopeForward = FMath::VInterpTo(
+					SlopeForward,
+					TargetDownhill,
+					DeltaTime,
+					FMath::Max(0.0f, SlopeForwardInterpSpeed)).GetSafeNormal();
+			}
 		}
 
 		// Snap to terrain surface — deadzone prevents micro-jitter on mesh seams
@@ -189,9 +200,10 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 		}
 
 		// Initialize heading from slope on first ground contact
-		if (DesiredYaw == 0.0f && !SlopeForward.IsNearlyZero())
+		if (bNeedsHeadingInit && !SlopeForward.IsNearlyZero())
 		{
 			DesiredYaw = SlopeForward.Rotation().Yaw;
+			VisualYaw = DesiredYaw;
 		}
 
 		if (IPowderSurfaceQueryProvider* SurfaceProvider = ResolveSurfaceQueryProvider(DeltaTime))
@@ -564,6 +576,8 @@ void UPowderMovementComponent::ResetMovementState()
 	LastCarveSign = 0;
 	CarvePressure = 0.0f;
 	Velocity = FVector::ZeroVector;
+	SlopeForward = FVector::ForwardVector;
+	SlopeNormal = FVector::UpVector;
 }
 
 void UPowderMovementComponent::SetFrozen(bool bFreeze)
@@ -693,6 +707,14 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 		float HorizontalSpeed = HorizontalVel.Size();
 		float SpeedPenalty = (1.0f - LandingQuality) * LandingSpeedPenaltyMax;
 		CurrentSpeed = FMath::Clamp(HorizontalSpeed * (1.0f - SpeedPenalty), 0.0f, MaxSpeed);
+
+		// Align heading to airborne velocity so movement direction matches on landing
+		if (HorizontalSpeed > 10.0f)
+		{
+			float LandingYaw = HorizontalVel.Rotation().Yaw;
+			DesiredYaw = LandingYaw;
+			VisualYaw = LandingYaw;
+		}
 
 		// Set landing control penalty for bad landings
 		if (LandingQuality < 1.0f)
