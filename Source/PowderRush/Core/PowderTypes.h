@@ -118,155 +118,227 @@ struct POWDERRUSH_API FMovementTuning
 {
 	GENERATED_BODY()
 
+	/** World gravity in cm/s^2. Default 980 = Earth gravity. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float GravityAcceleration = 980.0f;
 
+	/** Fallback slope angle (degrees) when no terrain normal is available. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float SlopeAngle = 15.0f;
 
-	/** Scales gravity contribution along slope for gameplay feel (not physical realism). */
+	/** Scales gravity along slope. Lower = slower acceleration, higher = steeper feel. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float GravityAlongSlopeScale = 0.45f;
 
-	/** Caps effective slope angle used for acceleration so very steep terrain does not over-accelerate. */
+	/** Caps slope angle for acceleration. Prevents runaway speed on very steep terrain. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float MaxAccelerationSlopeAngle = 28.0f;
 
+	/** Top speed in cm/s. Higher = faster runs, harder to control. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float MaxSpeed = 3000.0f;
 
+	/** Base snow friction. Higher = slower overall, more drag when straight-lining. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float BaseFriction = 0.02f;
 
+	/** Speed penalty from carving. Higher = more speed lost in turns. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CarveSpeedBleed = 0.5f;
 
+	/** How fast speed bleed ramps up/down. Lower = smoother transitions, higher = snappier. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CarveBleedSmoothing = 1.5f;
 
+	/** How fast the carve angle moves toward target. Higher = snappier turn entry. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
-	float CarveRate = 1.0f;
+	float CarveRate = 3.0f;
 
+	/** How fast the carve angle returns to center on release. Lower = longer arcs after release. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CarveReturnRate = 0.5f;
 
+	/** Maximum carve deflection in degrees. Wider = more extreme turns possible. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float MaxCarveAngle = 90.0f;
 
+	/** Base yaw rotation speed in deg/s. Legacy param, mostly superseded by TurnRateLimit. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float YawRate = 90.0f;
 
+	/** Sideways drift speed during carves in cm/s. Creates the carved arc movement. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CarveLateralSpeed = 1400.0f;
 
+	/** Rate boost meter fills from carving (0-1 per second). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float BoostFillRate = 0.3f;
 
+	/** Extra speed added during boost in cm/s. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float BoostBurstSpeed = 1500.0f;
 
+	/** How long boost lasts in seconds. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float BoostDuration = 0.5f;
 
+	/** Upward impulse for ollie in cm/s. Higher = bigger air. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float OllieForce = 450.0f;
 
+	/** Minimum seconds between ollies. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float OllieCooldown = 1.0f;
 
+	/** FInterpTo speed for raw input smoothing. Higher = more responsive, lower = smoother. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
-	float CarveInputSmoothing = 5.0f;
+	float CarveInputSmoothing = 10.0f;
 
+	/** Seconds for touch input to ramp from min to full intensity. Lower = snappier. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
-	float CarveRampTime = 0.6f;
+	float CarveRampTime = 0.25f;
 
+	/** Instant carve intensity on first touch frame (0-1). Higher = more immediate response. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
-	float CarveRampMinIntensity = 0.2f;
+	float CarveRampMinIntensity = 0.5f;
 
+	/** Ease-in curve shape for ramp. 1.0 = linear, 2.0 = quadratic, lower = faster ramp. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
-	float CarveRampEaseExponent = 2.0f;
+	float CarveRampEaseExponent = 1.5f;
 
+	/** How much speed limits max carve angle. 0 = no limit, 1 = full limit at max speed. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float SpeedTurnLimitFactor = 0.5f;
 
+	/** Minimum allowed carve angle at max speed (degrees). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float MinTurnAngleAtMaxSpeed = 30.0f;
 
+	/** Visual yaw lag in seconds. 0 = instant, >0 = capsule rotation lags behind heading. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float YawSmoothing = 0.0f;
 
+	/** Minimum Z component of ground normal to count as walkable terrain. Rejects walls. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float MinGroundNormalZ = 0.2f;
 
+	/** FInterpTo speed for filtering terrain normal. Higher = tracks bumps, lower = smooths them. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float GroundNormalFilterSpeed = 12.0f;
 
+	/** Deg/s the heading auto-aligns back to downhill when input is neutral. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float DownhillAlignRate = 55.0f;
 
+	/** Max heading change rate in deg/s. Caps how fast you can steer. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float TurnRateLimitDegPerSec = 220.0f;
 
+	/** Exponent for carve-depth-to-speed-bleed curve. Higher = less bleed at shallow angles. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CarveBleedExponent = 1.8f;
 
 	// --- Ski Feel ---
 
-	/** Fraction of TurnRateLimitDegPerSec at MaxSpeed. Lower = wider arcs at speed. */
+	/** Turn rate multiplier at max speed. 0.35 = 35% of base turn rate when going full speed. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float SpeedTurnRateMin = 0.35f;
 
-	/** Curve shape for speed-vs-turn-rate mapping (>1 = drops faster at high speed). */
+	/** How aggressively turn rate drops with speed. >1 = drops faster at high speed. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float SpeedTurnRateExponent = 1.2f;
 
-	/** Rate at which edge authority approaches 1.0 (~0.33s at 3.0). */
+	/** FInterpTo rate for edge engagement. Higher = edges bite faster on input. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
-	float EdgeEngageRate = 3.0f;
+	float EdgeEngageRate = 6.0f;
 
-	/** Rate at which edge authority falls back to 0.0 (~0.25s at 4.0). */
+	/** FInterpTo rate for edge release. Higher = edges release faster. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float EdgeDisengageRate = 4.0f;
 
-	/** Immediate minimum edge authority so taps aren't dead. */
+	/** Minimum edge depth on input so taps produce immediate response. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float EdgeMinDepth = 0.3f;
 
-	/** Gravity factor when heading perpendicular to fall line (0 = no gravity, 1 = full). */
+	/** Gravity factor at 90 degrees off fall line. 0 = coast, 1 = full gravity, <0 = brake. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float HeadingTraverseFactor = 0.15f;
 
-	/** Gravity factor when heading uphill (negative = braking force). */
+	/** Gravity factor heading uphill. Negative = active braking. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float HeadingUphillFactor = -0.3f;
 
-	/** Friction reduction when traversing (compensates for less gravity). */
+	/** Friction scaling off fall line. Lower = less drag when traversing. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float HeadingFrictionScale = 0.5f;
 
-	/** Seconds the carve arc continues after input release. */
+	/** Seconds the carve arc holds after input release. Longer = more momentum carry. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float TurnCommitTime = 0.2f;
 
-	/** How much the committed arc decays during the commit window (0 = hold exact, 1 = linear fade). */
+	/** How much the committed arc decays. 0 = hold exact angle, 1 = fade to straight. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float TurnCommitDecay = 0.3f;
 
-	/** Max speed loss fraction on worst landing (nose-into-ground). */
+	/** Max speed loss on worst landing (0-1). 0.4 = lose up to 40% speed. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float LandingSpeedPenaltyMax = 0.4f;
 
-	/** Seconds of reduced control after a bad landing. */
+	/** Seconds of reduced steering after a bad landing. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float LandingControlPenaltyDuration = 0.5f;
 
-	/** Control multiplier during landing penalty period. */
+	/** Steering multiplier during landing penalty. 0.5 = half steering authority. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float LandingControlPenaltyFactor = 0.5f;
 
-	/** Dot product above which landing is considered perfect (no penalty). */
+	/** Landing quality above this threshold = perfect (no penalty). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float LandingQualityThreshold = 0.85f;
+
+	// --- Terrain & Air ---
+
+	/** Height difference below which terrain snap is skipped to prevent micro-jitter. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float TerrainSnapThreshold = 3.0f;
+
+	/** Seconds to blend from airborne to full ground physics after landing. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float LandingBlendDuration = 0.15f;
+
+	/** Air resistance. Damps all velocity axes in air. 0 = none, 1 = heavy. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float AirDragCoefficient = 0.5f;
+
+	/** Max downward speed in air (cm/s). Prevents infinite freefall acceleration. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float AirTerminalVelocity = 1500.0f;
+
+	// --- Edge Feel ---
+
+	/** Seconds of low-grip flat-ski phase when switching edges (left to right). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float EdgeTransitionTime = 0.06f;
+
+	/** Grip multiplier during edge transition. 0.15 = 15% grip, near-zero = slippery. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float EdgeTransitionGrip = 0.15f;
+
+	/** Rate carve pressure builds during sustained holds (0 to 1 in ~0.7s at 1.5). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float CarvePressureBuildRate = 1.5f;
+
+	/** Rate carve pressure drops on release. Higher = pressure vanishes faster. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float CarvePressureDecayRate = 3.0f;
+
+	/** Extra turn rate at max pressure. 0.15 = 15% faster turning when fully committed. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float CarvePressureTurnBonus = 0.15f;
+
+	/** Extra speed bleed at max pressure. Deep committed carves cost more speed. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float CarvePressureBleedBonus = 0.2f;
 };
 
 USTRUCT(BlueprintType)

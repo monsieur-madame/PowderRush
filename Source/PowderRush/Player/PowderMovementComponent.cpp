@@ -38,6 +38,17 @@ void UPowderMovementComponent::TickComponent(float DeltaTime, ELevelTick TickTyp
 		return;
 	}
 
+	// Tick landing blend
+	if (bIsLandingBlend)
+	{
+		LandingBlendTimer -= DeltaTime;
+		if (LandingBlendTimer <= 0.0f)
+		{
+			LandingBlendTimer = 0.0f;
+			bIsLandingBlend = false;
+		}
+	}
+
 	TickTuningBlend(DeltaTime);
 	TickSurfaceBlend(DeltaTime);
 	UpdateTerrainFollowing(DeltaTime);
@@ -168,11 +179,14 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 				FMath::Max(0.0f, SlopeForwardInterpSpeed)).GetSafeNormal();
 		}
 
-		// Immediate snap to terrain surface (capsule half-height offset)
+		// Snap to terrain surface — deadzone prevents micro-jitter on mesh seams
 		float DesiredHeight = Hit.ImpactPoint.Z + CapsuleHalfHeight + TerrainContactOffset;
 		float HeightDelta = DesiredHeight - CurrentLocation.Z;
-		FVector HeightAdjust = FVector(0.0f, 0.0f, HeightDelta);
-		UpdatedComponent->MoveComponent(HeightAdjust, UpdatedComponent->GetComponentRotation(), true);
+		if (FMath::Abs(HeightDelta) > TerrainSnapThreshold)
+		{
+			FVector HeightAdjust = FVector(0.0f, 0.0f, HeightDelta);
+			UpdatedComponent->MoveComponent(HeightAdjust, UpdatedComponent->GetComponentRotation(), true);
+		}
 
 		// Initialize heading from slope on first ground contact
 		if (DesiredYaw == 0.0f && !SlopeForward.IsNearlyZero())
@@ -202,14 +216,21 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 
 void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 {
-	// --- Landing penalty tick (Feature 5) ---
+	// --- Landing blend: reduced carve authority while settling ---
 	float LandingControlMod = 1.0f;
+	if (bIsLandingBlend && LandingBlendDuration > KINDA_SMALL_NUMBER)
+	{
+		float LandingAlpha = 1.0f - (LandingBlendTimer / LandingBlendDuration);
+		LandingControlMod = LandingAlpha;
+	}
+
+	// --- Landing penalty tick (quality-based) ---
 	if (LandingPenaltyTimer > 0.0f)
 	{
 		LandingPenaltyTimer -= DeltaTime;
 		if (LandingPenaltyTimer > 0.0f)
 		{
-			LandingControlMod = FMath::Lerp(1.0f, LandingControlPenaltyFactor, LandingPenaltyStrength);
+			LandingControlMod *= FMath::Lerp(1.0f, LandingControlPenaltyFactor, LandingPenaltyStrength);
 		}
 		else
 		{
@@ -221,12 +242,34 @@ void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 	// Smooth raw input for less jittery carving
 	SmoothedCarveInput = FMath::FInterpTo(SmoothedCarveInput, CarveInput, DeltaTime, CarveInputSmoothing);
 
-	// --- Progressive edge engagement (Feature 2) ---
+	// --- Progressive edge engagement ---
 	const bool bHasInput = FMath::Abs(SmoothedCarveInput) > 0.05f;
 	const float EdgeTarget = bHasInput ? 1.0f : 0.0f;
 	const float EdgeRate = bHasInput ? EdgeEngageRate : EdgeDisengageRate;
 	EdgeDepth = FMath::FInterpTo(EdgeDepth, EdgeTarget, DeltaTime, EdgeRate);
-	const float EffectiveEdge = bHasInput ? FMath::Max(EdgeMinDepth, EdgeDepth) : EdgeDepth;
+	float EffectiveEdge = bHasInput ? FMath::Max(EdgeMinDepth, EdgeDepth) : EdgeDepth;
+
+	// --- Edge-to-edge transition (flat ski phase) ---
+	int32 CurrentSign = (SmoothedCarveInput > 0.05f) ? 1 : (SmoothedCarveInput < -0.05f) ? -1 : 0;
+	if (CurrentSign != 0 && LastCarveSign != 0 && CurrentSign != LastCarveSign)
+	{
+		bInEdgeTransition = true;
+		EdgeTransitionTimer = EdgeTransitionTime;
+		EdgeDepth = 0.0f;
+	}
+	if (CurrentSign != 0)
+	{
+		LastCarveSign = CurrentSign;
+	}
+	if (bInEdgeTransition)
+	{
+		EdgeTransitionTimer -= DeltaTime;
+		EffectiveEdge *= EdgeTransitionGrip;
+		if (EdgeTransitionTimer <= 0.0f)
+		{
+			bInEdgeTransition = false;
+		}
+	}
 
 	float TargetAngle = SmoothedCarveInput * MaxCarveAngle * EffectiveEdge;
 
@@ -249,15 +292,21 @@ void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 			&& FMath::Abs(CurrentCarveAngle) > 5.0f && TurnCommitTime > 0.0f)
 		{
 			CommittedCarveAngle = CurrentCarveAngle;
-			TurnCommitTimer = TurnCommitTime;
+			// Depth-scaled commitment: deeper carves carry more momentum
+			float CarveDepthAtRelease = FMath::Clamp(FMath::Abs(CurrentCarveAngle) / FMath::Max(1.0f, MaxCarveAngle), 0.0f, 1.0f);
+			TurnCommitTimer = TurnCommitTime * (0.5f + 0.5f * CarveDepthAtRelease);
 		}
 
 		if (TurnCommitTimer > 0.0f)
 		{
 			// During commit window: override target with decaying committed angle
+			// Deeper carves decay less (hold the arc longer)
+			float CarveDepthAtRelease = FMath::Clamp(FMath::Abs(CommittedCarveAngle) / FMath::Max(1.0f, MaxCarveAngle), 0.0f, 1.0f);
+			float ScaledCommitDecay = TurnCommitDecay * (1.0f - 0.5f * CarveDepthAtRelease);
 			TurnCommitTimer -= DeltaTime;
-			float CommitProgress = 1.0f - FMath::Clamp(TurnCommitTimer / FMath::Max(KINDA_SMALL_NUMBER, TurnCommitTime), 0.0f, 1.0f);
-			TargetAngle = FMath::Lerp(CommittedCarveAngle, 0.0f, CommitProgress * TurnCommitDecay);
+			float ScaledCommitTime = TurnCommitTime * (0.5f + 0.5f * CarveDepthAtRelease);
+			float CommitProgress = 1.0f - FMath::Clamp(TurnCommitTimer / FMath::Max(KINDA_SMALL_NUMBER, ScaledCommitTime), 0.0f, 1.0f);
+			TargetAngle = FMath::Lerp(CommittedCarveAngle, 0.0f, CommitProgress * ScaledCommitDecay);
 		}
 	}
 
@@ -276,9 +325,20 @@ void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 
 	CurrentCarveAngle = FMath::FInterpTo(CurrentCarveAngle, TargetAngle, DeltaTime, InterpSpeed);
 
-	// --- Speed-dependent turn rate (Feature 1) ---
+	// --- Carve pressure accumulator ---
+	if (bHasInput && EdgeDepth > 0.5f)
+	{
+		CarvePressure = FMath::FInterpTo(CarvePressure, EdgeDepth, DeltaTime, CarvePressureBuildRate);
+	}
+	else
+	{
+		CarvePressure = FMath::FInterpTo(CarvePressure, 0.0f, DeltaTime, CarvePressureDecayRate);
+	}
+
+	// --- Speed-dependent turn rate ---
 	const float SpeedAlpha = FMath::Pow(SpeedNorm, FMath::Max(0.01f, SpeedTurnRateExponent));
-	const float EffectiveTurnRate = FMath::Lerp(TurnRateLimitDegPerSec, TurnRateLimitDegPerSec * SpeedTurnRateMin, SpeedAlpha) * LandingControlMod;
+	const float BaseTurnRate = FMath::Lerp(TurnRateLimitDegPerSec, TurnRateLimitDegPerSec * SpeedTurnRateMin, SpeedAlpha) * LandingControlMod;
+	const float EffectiveTurnRate = BaseTurnRate * (1.0f + CarvePressure * CarvePressureTurnBonus);
 	const float EffectiveDownhillAlign = FMath::Lerp(DownhillAlignRate, DownhillAlignRate * SpeedTurnRateMin, SpeedAlpha);
 
 	// Rate-limited heading update for more readable, committed carve arcs.
@@ -361,7 +421,7 @@ void UPowderMovementComponent::UpdateSpeed(float DeltaTime)
 	const float CarveDepth = FMath::Clamp(FMath::Abs(CurrentCarveAngle) / MaxCarveSafe, 0.0f, 1.0f);
 	const float RawCarveBleed = CarveSpeedBleed * FMath::Pow(CarveDepth, FMath::Max(0.01f, CarveBleedExponent));
 	SmoothedCarveBleed = FMath::FInterpTo(SmoothedCarveBleed, RawCarveBleed, DeltaTime, CarveBleedSmoothing);
-	const float CarveBleed = SmoothedCarveBleed;
+	const float CarveBleed = SmoothedCarveBleed * (1.0f + CarvePressure * CarvePressureBleedBonus);
 
 	// Apply equipment and surface modifiers
 	float SpeedMod = EquipmentStats.SpeedMultiplier * CurrentSurface.SpeedMultiplier;
@@ -497,6 +557,12 @@ void UPowderMovementComponent::ResetMovementState()
 	CommittedCarveAngle = 0.0f;
 	LandingPenaltyTimer = 0.0f;
 	LandingPenaltyStrength = 0.0f;
+	LandingBlendTimer = 0.0f;
+	bIsLandingBlend = false;
+	EdgeTransitionTimer = 0.0f;
+	bInEdgeTransition = false;
+	LastCarveSign = 0;
+	CarvePressure = 0.0f;
 	Velocity = FVector::ZeroVector;
 }
 
@@ -546,8 +612,14 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 
 	AirborneTimer += DeltaTime;
 
-	// Apply gravity
+	// Apply air drag (reduces all axes, damps horizontal drift)
+	AirborneVelocity -= AirborneVelocity * AirDragCoefficient * DeltaTime;
+
+	// Apply gravity after drag
 	AirborneVelocity.Z -= GravityAcceleration * DeltaTime;
+
+	// Clamp to terminal velocity
+	AirborneVelocity.Z = FMath::Max(AirborneVelocity.Z, -AirTerminalVelocity);
 
 	FVector Movement = AirborneVelocity * DeltaTime;
 	FRotator CurrentRotation = UpdatedComponent->GetComponentRotation();
@@ -590,6 +662,10 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 	if (bLanded)
 	{
 		bIsAirborne = false;
+
+		// Start landing blend
+		bIsLandingBlend = true;
+		LandingBlendTimer = LandingBlendDuration;
 
 		// --- Landing quality assessment (Feature 5) ---
 		// Perfect landing: velocity parallel to slope (dot with normal ~ 0)
@@ -767,6 +843,16 @@ void UPowderMovementComponent::ApplyTuningProfile(const FMovementTuning& Tuning,
 	TuningBlendStart.LandingControlPenaltyDuration = LandingControlPenaltyDuration;
 	TuningBlendStart.LandingControlPenaltyFactor = LandingControlPenaltyFactor;
 	TuningBlendStart.LandingQualityThreshold = LandingQualityThreshold;
+	TuningBlendStart.TerrainSnapThreshold = TerrainSnapThreshold;
+	TuningBlendStart.LandingBlendDuration = LandingBlendDuration;
+	TuningBlendStart.AirDragCoefficient = AirDragCoefficient;
+	TuningBlendStart.AirTerminalVelocity = AirTerminalVelocity;
+	TuningBlendStart.EdgeTransitionTime = EdgeTransitionTime;
+	TuningBlendStart.EdgeTransitionGrip = EdgeTransitionGrip;
+	TuningBlendStart.CarvePressureBuildRate = CarvePressureBuildRate;
+	TuningBlendStart.CarvePressureDecayRate = CarvePressureDecayRate;
+	TuningBlendStart.CarvePressureTurnBonus = CarvePressureTurnBonus;
+	TuningBlendStart.CarvePressureBleedBonus = CarvePressureBleedBonus;
 
 	TuningBlendTarget = Tuning;
 	TuningBlendDuration = FMath::Max(BlendTime, KINDA_SMALL_NUMBER);
@@ -828,6 +914,16 @@ void UPowderMovementComponent::TickTuningBlend(float DeltaTime)
 	LandingControlPenaltyDuration = FMath::Lerp(TuningBlendStart.LandingControlPenaltyDuration, TuningBlendTarget.LandingControlPenaltyDuration, Alpha);
 	LandingControlPenaltyFactor = FMath::Lerp(TuningBlendStart.LandingControlPenaltyFactor, TuningBlendTarget.LandingControlPenaltyFactor, Alpha);
 	LandingQualityThreshold = FMath::Lerp(TuningBlendStart.LandingQualityThreshold, TuningBlendTarget.LandingQualityThreshold, Alpha);
+	TerrainSnapThreshold = FMath::Lerp(TuningBlendStart.TerrainSnapThreshold, TuningBlendTarget.TerrainSnapThreshold, Alpha);
+	LandingBlendDuration = FMath::Lerp(TuningBlendStart.LandingBlendDuration, TuningBlendTarget.LandingBlendDuration, Alpha);
+	AirDragCoefficient = FMath::Lerp(TuningBlendStart.AirDragCoefficient, TuningBlendTarget.AirDragCoefficient, Alpha);
+	AirTerminalVelocity = FMath::Lerp(TuningBlendStart.AirTerminalVelocity, TuningBlendTarget.AirTerminalVelocity, Alpha);
+	EdgeTransitionTime = FMath::Lerp(TuningBlendStart.EdgeTransitionTime, TuningBlendTarget.EdgeTransitionTime, Alpha);
+	EdgeTransitionGrip = FMath::Lerp(TuningBlendStart.EdgeTransitionGrip, TuningBlendTarget.EdgeTransitionGrip, Alpha);
+	CarvePressureBuildRate = FMath::Lerp(TuningBlendStart.CarvePressureBuildRate, TuningBlendTarget.CarvePressureBuildRate, Alpha);
+	CarvePressureDecayRate = FMath::Lerp(TuningBlendStart.CarvePressureDecayRate, TuningBlendTarget.CarvePressureDecayRate, Alpha);
+	CarvePressureTurnBonus = FMath::Lerp(TuningBlendStart.CarvePressureTurnBonus, TuningBlendTarget.CarvePressureTurnBonus, Alpha);
+	CarvePressureBleedBonus = FMath::Lerp(TuningBlendStart.CarvePressureBleedBonus, TuningBlendTarget.CarvePressureBleedBonus, Alpha);
 
 	if (Alpha >= 1.0f)
 	{

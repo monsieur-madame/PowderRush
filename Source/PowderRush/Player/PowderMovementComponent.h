@@ -127,7 +127,7 @@ public:
 	float CarveSpeedBleed = 0.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveRate = 1.0f;
+	float CarveRate = 3.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float CarveReturnRate = 0.5f;
@@ -167,16 +167,16 @@ public:
 	float OllieCooldown = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveInputSmoothing = 5.0f;
+	float CarveInputSmoothing = 10.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveRampTime = 0.6f;
+	float CarveRampTime = 0.25f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveRampMinIntensity = 0.2f;
+	float CarveRampMinIntensity = 0.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveRampEaseExponent = 2.0f;
+	float CarveRampEaseExponent = 1.5f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float SpeedTurnLimitFactor = 0.5f;
@@ -217,7 +217,7 @@ public:
 	float SpeedTurnRateExponent = 1.2f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float EdgeEngageRate = 3.0f;
+	float EdgeEngageRate = 6.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float EdgeDisengageRate = 4.0f;
@@ -251,6 +251,40 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float LandingQualityThreshold = 0.85f;
+
+	// --- Terrain & Air ---
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float TerrainSnapThreshold = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float LandingBlendDuration = 0.15f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float AirDragCoefficient = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float AirTerminalVelocity = 1500.0f;
+
+	// --- Edge Feel ---
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float EdgeTransitionTime = 0.06f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float EdgeTransitionGrip = 0.15f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarvePressureBuildRate = 1.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarvePressureDecayRate = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarvePressureTurnBonus = 0.15f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarvePressureBleedBonus = 0.2f;
 
 	// --- Equipment Stats (applied from equipped gear) ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Equipment")
@@ -296,6 +330,18 @@ protected:
 	float CommittedCarveAngle = 0.0f;
 	float LandingPenaltyTimer = 0.0f;
 	float LandingPenaltyStrength = 0.0f;
+
+	// Landing blend state
+	float LandingBlendTimer = 0.0f;
+	bool bIsLandingBlend = false;
+
+	// Edge transition state
+	float EdgeTransitionTimer = 0.0f;
+	bool bInEdgeTransition = false;
+	int32 LastCarveSign = 0;
+
+	// Carve pressure state
+	float CarvePressure = 0.0f;
 
 	// Wipeout recovery
 	float WipeoutRecoveryTimer = 0.0f;

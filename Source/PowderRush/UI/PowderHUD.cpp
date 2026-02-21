@@ -893,6 +893,22 @@ void APowderHUD::BuildDevParamList()
 	Add(TEXT("LandCtrlFactor"),  &MC->LandingControlPenaltyFactor, 0.05f,   0.0f,    1.0f);
 	Add(TEXT("LandQualThresh"),  &MC->LandingQualityThreshold,     0.05f,   0.0f,    1.0f);
 
+	// -- Terrain & Air params --
+	AddHeader(TEXT("-- Terrain & Air --"));
+	Add(TEXT("TerrSnapThresh"),  &MC->TerrainSnapThreshold,       0.5f,    0.5f,    20.0f);
+	Add(TEXT("LandBlendDur"),    &MC->LandingBlendDuration,       0.01f,   0.0f,    0.5f);
+	Add(TEXT("AirDrag"),         &MC->AirDragCoefficient,         0.05f,   0.0f,    2.0f);
+	Add(TEXT("AirTerminalVel"),  &MC->AirTerminalVelocity,        50.0f,   200.0f,  5000.0f);
+
+	// -- Edge Feel params --
+	AddHeader(TEXT("-- Edge Feel --"));
+	Add(TEXT("EdgeTransTime"),   &MC->EdgeTransitionTime,         0.01f,   0.0f,    0.5f);
+	Add(TEXT("EdgeTransGrip"),   &MC->EdgeTransitionGrip,         0.05f,   0.0f,    1.0f);
+	Add(TEXT("PressureBuild"),   &MC->CarvePressureBuildRate,     0.1f,    0.1f,    5.0f);
+	Add(TEXT("PressureDecay"),   &MC->CarvePressureDecayRate,     0.1f,    0.5f,    10.0f);
+	Add(TEXT("PressureTurnBns"), &MC->CarvePressureTurnBonus,     0.05f,   0.0f,    0.5f);
+	Add(TEXT("PressureBleedBns"),&MC->CarvePressureBleedBonus,    0.05f,   0.0f,    0.5f);
+
 	// -- Camera params --
 	AddHeader(TEXT("-- Camera --"));
 	Add(TEXT("BaseArmLen"),        &Char->BaseArmLength,       50.0f,   200.0f,  5000.0f);

@@ -61,7 +61,7 @@ protected:
 	float KeyboardHoldDuration = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Input|Feel", meta = (ClampMin = "0.0"))
-	float CarveSideSwitchCooldown = 0.08f;
+	float CarveSideSwitchCooldown = 0.04f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Input|Feel", meta = (ClampMin = "0.0"))
 	float CarveReleaseGraceTime = 0.06f;
