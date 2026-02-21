@@ -346,45 +346,59 @@ struct POWDERRUSH_API FCameraTuning
 {
 	GENERATED_BODY()
 
+	/** Spring arm length at rest (cm). Larger = more zoomed out. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float BaseArmLength = 1400.0f;
 
+	/** Spring arm length at max speed (cm). Creates a zoom-out effect as speed increases. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float MaxArmLength = 1800.0f;
 
+	/** How fast the arm length interpolates between Base and Max (higher = snappier zoom). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float ArmLengthInterpSpeed = 3.0f;
 
+	/** Camera pitch at rest (degrees, negative = looking down). Controls the default viewing angle. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float BasePitch = -30.0f;
 
+	/** Camera pitch at max speed (degrees). Typically flatter than base to show more ahead. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float SpeedPitch = -22.0f;
 
+	/** Static yaw offset from behind the character (degrees). 0 = directly behind. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float BaseYawOffset = 0.0f;
 
+	/** How much the camera yaw tracks the character's heading direction (0=none, 1=fully follows). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CameraHeadingFollow = 0.5f;
 
+	/** Smoothing speed for camera yaw rotation (lower = more lag, higher = snappier follow). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CameraYawInterpSpeed = 0.5f;
 
+	/** Field of view at rest (degrees). Standard is 70-75. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float BaseFOV = 72.0f;
 
+	/** Field of view at max speed (degrees). Creates a speed rush effect as FOV widens. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float MaxFOV = 82.0f;
 
+	/** How fast FOV interpolates between Base and Max (higher = snappier response). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float FOVInterpSpeed = 3.0f;
 
+	/** How much the camera leads into turns (0=none, 1=full). Anticipates carve direction. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CameraTurnLeadWeight = 0.55f;
 
+	/** How much the camera looks ahead of the character's velocity (0=none, 1=full). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CameraLookAheadWeight = 0.35f;
 
+	/** Maximum yaw angle for look-ahead offset (degrees). Caps how far the camera can swing. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CameraLookAheadMaxYaw = 20.0f;
 };
