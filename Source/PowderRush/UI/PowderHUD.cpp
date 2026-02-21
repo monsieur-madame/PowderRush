@@ -876,6 +876,23 @@ void APowderHUD::BuildDevParamList()
 	Add(TEXT("TurnRateLimit"),   &MC->TurnRateLimitDegPerSec,1.0f,    10.0f,   720.0f);
 	Add(TEXT("CarveBleedExp"),   &MC->CarveBleedExponent,    0.05f,   0.1f,    4.0f);
 
+	// -- Ski Feel params --
+	AddHeader(TEXT("-- Ski Feel --"));
+	Add(TEXT("SpdTurnRateMin"),  &MC->SpeedTurnRateMin,             0.05f,   0.1f,    1.0f);
+	Add(TEXT("SpdTurnRateExp"),  &MC->SpeedTurnRateExponent,        0.05f,   0.1f,    4.0f);
+	Add(TEXT("EdgeEngageRate"),  &MC->EdgeEngageRate,               0.5f,    0.5f,    20.0f);
+	Add(TEXT("EdgeDisengRate"),  &MC->EdgeDisengageRate,            0.5f,    0.5f,    20.0f);
+	Add(TEXT("EdgeMinDepth"),    &MC->EdgeMinDepth,                 0.05f,   0.0f,    1.0f);
+	Add(TEXT("HeadTraverse"),    &MC->HeadingTraverseFactor,        0.05f,  -0.5f,    1.0f);
+	Add(TEXT("HeadUphill"),      &MC->HeadingUphillFactor,          0.05f,  -1.0f,    0.5f);
+	Add(TEXT("HeadFriction"),    &MC->HeadingFrictionScale,         0.05f,   0.0f,    1.0f);
+	Add(TEXT("TurnCommitTime"),  &MC->TurnCommitTime,              0.05f,   0.0f,    1.0f);
+	Add(TEXT("TurnCommitDecay"), &MC->TurnCommitDecay,             0.05f,   0.0f,    1.0f);
+	Add(TEXT("LandSpdPenalty"),  &MC->LandingSpeedPenaltyMax,      0.05f,   0.0f,    1.0f);
+	Add(TEXT("LandCtrlDur"),     &MC->LandingControlPenaltyDuration,0.05f,  0.0f,    2.0f);
+	Add(TEXT("LandCtrlFactor"),  &MC->LandingControlPenaltyFactor, 0.05f,   0.0f,    1.0f);
+	Add(TEXT("LandQualThresh"),  &MC->LandingQualityThreshold,     0.05f,   0.0f,    1.0f);
+
 	// -- Camera params --
 	AddHeader(TEXT("-- Camera --"));
 	Add(TEXT("BaseArmLen"),        &Char->BaseArmLength,       50.0f,   200.0f,  5000.0f);

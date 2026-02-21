@@ -52,7 +52,7 @@ public:
 	void OnBecameAirborne();
 
 	UFUNCTION()
-	void OnLanded(float AirTime);
+	void OnLanded(float AirTime, float LandingQuality);
 
 protected:
 	EPowderTrickState CurrentState = EPowderTrickState::Idle;
@@ -81,4 +81,5 @@ protected:
 	void CompleteTrick();
 	void FailTrick();
 	void ResetJumpState();
+	void RestoreBaseRotation();
 };

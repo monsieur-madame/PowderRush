@@ -7,7 +7,6 @@
 class UPowderMovementComponent;
 class UPowderTrickComponent;
 class UPowderTuningProfile;
-class UCapsuleComponent;
 class UStaticMeshComponent;
 class USpringArmComponent;
 class UCameraComponent;
@@ -116,9 +115,6 @@ public:
 	int32 PreviousFeelPresetIndex = INDEX_NONE;
 
 protected:
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UCapsuleComponent> CapsuleComp;
-
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
 	TObjectPtr<UStaticMeshComponent> MeshComp;
 

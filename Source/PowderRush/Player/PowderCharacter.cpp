@@ -3,7 +3,6 @@
 #include "Player/PowderTrickComponent.h"
 #include "Scoring/ScoreSubsystem.h"
 #include "Engine/GameInstance.h"
-#include "Components/CapsuleComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
 #include "Engine/StaticMesh.h"
@@ -18,18 +17,11 @@ APowderCharacter::APowderCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// Capsule collision
-	CapsuleComp = CreateDefaultSubobject<UCapsuleComponent>(TEXT("Capsule"));
-	CapsuleComp->InitCapsuleSize(40.0f, 90.0f);
-	CapsuleComp->SetCollisionProfileName(TEXT("Pawn"));
-	SetRootComponent(CapsuleComp);
-
-	// Skier mesh (pivot is at model center, so Z=0 aligns center-to-center with capsule)
+	// Skier mesh as root — uses collision set up in the static mesh editor
 	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
-	MeshComp->SetupAttachment(CapsuleComp);
-	MeshComp->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
-	MeshComp->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MeshComp->SetCollisionProfileName(TEXT("Pawn"));
 	MeshComp->SetRelativeScale3D(FVector(1.0f, 1.0f, 1.0f));
+	SetRootComponent(MeshComp);
 	static ConstructorHelpers::FObjectFinder<UStaticMesh> SkierMeshAsset(
 		TEXT("/Game/Skier/Skier.Skier"));
 	if (SkierMeshAsset.Succeeded())
@@ -39,7 +31,7 @@ APowderCharacter::APowderCharacter()
 
 	// Spring arm for three-quarter diorama camera
 	SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
-	SpringArmComp->SetupAttachment(CapsuleComp);
+	SpringArmComp->SetupAttachment(MeshComp);
 	SpringArmComp->TargetArmLength = 900.0f;
 	SpringArmComp->SetRelativeRotation(FRotator(-45.0f, 30.0f, 0.0f));
 	SpringArmComp->SetUsingAbsoluteRotation(true);
@@ -55,12 +47,12 @@ APowderCharacter::APowderCharacter()
 
 	// Snow spray (Niagara particle system)
 	SnowSprayComp = CreateDefaultSubobject<UPowderSnowSpray>(TEXT("SnowSpray"));
-	SnowSprayComp->SetupAttachment(CapsuleComp);
+	SnowSprayComp->SetupAttachment(MeshComp);
 	SnowSprayComp->SetRelativeLocation(FVector(0.0f, 0.0f, -80.0f));
 
 	// Custom movement
 	MovementComp = CreateDefaultSubobject<UPowderMovementComponent>(TEXT("PowderMovement"));
-	MovementComp->SetUpdatedComponent(CapsuleComp);
+	MovementComp->SetUpdatedComponent(MeshComp);
 
 	// Trick system
 	TrickComp = CreateDefaultSubobject<UPowderTrickComponent>(TEXT("TrickComponent"));

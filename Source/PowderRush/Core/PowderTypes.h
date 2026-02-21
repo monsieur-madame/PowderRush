@@ -209,6 +209,64 @@ struct POWDERRUSH_API FMovementTuning
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	float CarveBleedExponent = 1.8f;
+
+	// --- Ski Feel ---
+
+	/** Fraction of TurnRateLimitDegPerSec at MaxSpeed. Lower = wider arcs at speed. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float SpeedTurnRateMin = 0.35f;
+
+	/** Curve shape for speed-vs-turn-rate mapping (>1 = drops faster at high speed). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float SpeedTurnRateExponent = 1.2f;
+
+	/** Rate at which edge authority approaches 1.0 (~0.33s at 3.0). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float EdgeEngageRate = 3.0f;
+
+	/** Rate at which edge authority falls back to 0.0 (~0.25s at 4.0). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float EdgeDisengageRate = 4.0f;
+
+	/** Immediate minimum edge authority so taps aren't dead. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float EdgeMinDepth = 0.3f;
+
+	/** Gravity factor when heading perpendicular to fall line (0 = no gravity, 1 = full). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float HeadingTraverseFactor = 0.15f;
+
+	/** Gravity factor when heading uphill (negative = braking force). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float HeadingUphillFactor = -0.3f;
+
+	/** Friction reduction when traversing (compensates for less gravity). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float HeadingFrictionScale = 0.5f;
+
+	/** Seconds the carve arc continues after input release. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float TurnCommitTime = 0.2f;
+
+	/** How much the committed arc decays during the commit window (0 = hold exact, 1 = linear fade). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float TurnCommitDecay = 0.3f;
+
+	/** Max speed loss fraction on worst landing (nose-into-ground). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float LandingSpeedPenaltyMax = 0.4f;
+
+	/** Seconds of reduced control after a bad landing. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float LandingControlPenaltyDuration = 0.5f;
+
+	/** Control multiplier during landing penalty period. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float LandingControlPenaltyFactor = 0.5f;
+
+	/** Dot product above which landing is considered perfect (no penalty). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
+	float LandingQualityThreshold = 0.85f;
 };
 
 USTRUCT(BlueprintType)

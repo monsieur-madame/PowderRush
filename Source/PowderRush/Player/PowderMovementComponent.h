@@ -99,7 +99,7 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "PowderRush|Movement")
 	FOnLaunched OnLaunched;
 
-	DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnLanded, float, AirTime);
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnLanded, float, AirTime, float, LandingQuality);
 	UPROPERTY(BlueprintAssignable, Category = "PowderRush|Movement")
 	FOnLanded OnLanded;
 
@@ -208,6 +208,50 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float CarveBleedExponent = 1.8f;
 
+	// --- Ski Feel ---
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float SpeedTurnRateMin = 0.35f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float SpeedTurnRateExponent = 1.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float EdgeEngageRate = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float EdgeDisengageRate = 4.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float EdgeMinDepth = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float HeadingTraverseFactor = 0.15f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float HeadingUphillFactor = -0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float HeadingFrictionScale = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float TurnCommitTime = 0.2f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float TurnCommitDecay = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float LandingSpeedPenaltyMax = 0.4f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float LandingControlPenaltyDuration = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float LandingControlPenaltyFactor = 0.5f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float LandingQualityThreshold = 0.85f;
+
 	// --- Equipment Stats (applied from equipped gear) ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Equipment")
 	FEquipmentStats EquipmentStats;
@@ -245,6 +289,13 @@ protected:
 	float VisualYaw = 0.0f;
 	float LastTurnRateDegPerSec = 0.0f;
 	float GroundNormalStability = 1.0f;
+
+	// Ski feel state
+	float EdgeDepth = 0.0f;
+	float TurnCommitTimer = 0.0f;
+	float CommittedCarveAngle = 0.0f;
+	float LandingPenaltyTimer = 0.0f;
+	float LandingPenaltyStrength = 0.0f;
 
 	// Wipeout recovery
 	float WipeoutRecoveryTimer = 0.0f;
