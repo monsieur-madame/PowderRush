@@ -2,6 +2,7 @@
 
 #include "Core/PowderGameMode.h"
 #include "Core/PowderEnvironmentSetup.h"
+#include "Terrain/PowderAvalancheComponent.h"
 #include "Core/PowderGameInstance.h"
 #include "Terrain/TerrainManager.h"
 #include "Effects/PowderWeatherManager.h"
@@ -23,6 +24,7 @@ APowderGameMode::APowderGameMode()
 	HUDClass = APowderHUD::StaticClass();
 	RunState = EPowderRunState::InMenu;
 	PrimaryActorTick.bCanEverTick = true;
+	AvalancheComponent = CreateDefaultSubobject<UPowderAvalancheComponent>(TEXT("AvalancheComponent"));
 }
 
 void APowderGameMode::BeginPlay()
@@ -153,9 +155,9 @@ void APowderGameMode::OnWipeout()
 	SetRunState(EPowderRunState::WipedOut);
 	SetPlayerFrozen(true);
 
-	// Brief delay then respawn at slope start
+	// Brief delay then restart the whole run
 	GetWorldTimerManager().ClearTimer(WipeoutTimerHandle);
-	GetWorldTimerManager().SetTimer(WipeoutTimerHandle, this, &APowderGameMode::RespawnPlayer, 1.5f, false);
+	GetWorldTimerManager().SetTimer(WipeoutTimerHandle, this, &APowderGameMode::RestartRun, 1.5f, false);
 }
 
 void APowderGameMode::RespawnPlayer()

@@ -20,6 +20,7 @@ enum class EPowderRunState : uint8
 
 class APowderEnvironmentSetup;
 class ATerrainManager;
+class UPowderAvalancheComponent;
 
 UCLASS()
 class POWDERRUSH_API APowderGameMode : public AGameModeBase
@@ -34,6 +35,9 @@ public:
 
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Game")
 	APowderEnvironmentSetup* GetEnvironmentSetup() const { return EnvironmentSetup; }
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Game")
+	UPowderAvalancheComponent* GetAvalancheComponent() const { return AvalancheComponent; }
 
 	virtual void BeginPlay() override;
 	virtual void Tick(float DeltaTime) override;
@@ -92,6 +96,9 @@ protected:
 
 	UPROPERTY()
 	TObjectPtr<ATerrainManager> TerrainManager;
+
+	UPROPERTY()
+	TObjectPtr<UPowderAvalancheComponent> AvalancheComponent;
 
 	bool bRequiredActorsReady = false;
 	bool bHasLastAppliedWeather = false;

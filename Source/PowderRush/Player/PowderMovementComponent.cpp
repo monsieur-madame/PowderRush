@@ -444,17 +444,6 @@ void UPowderMovementComponent::UpdateSpeed(float DeltaTime)
 	float Acceleration = (AdjustedGravityForce - (AdjustedFriction + CarveBleed) * CurrentSpeed) * SpeedMod;
 	CurrentSpeed += Acceleration * DeltaTime;
 	CurrentSpeed = FMath::Clamp(CurrentSpeed, 0.0f, MaxSpeed * SpeedMod);
-
-	// Heading-deviation speed cap: speed cannot exceed what the forward component
-	// along the current heading provides relative to course direction.
-	// cos(0°)=1.0 (full speed), cos(45°)=0.71, cos(90°)=0 (no speed).
-	// This prevents accumulating speed while heading sideways or backwards,
-	// which per-frame cos projection alone doesn't catch for gradual turns.
-	{
-		float HeadingDeviation = FMath::Abs(FMath::FindDeltaAngleDegrees(DownhillYaw, DesiredYaw));
-		float HeadingSpeedCap = MaxSpeed * SpeedMod * FMath::Max(0.0f, FMath::Cos(FMath::DegreesToRadians(HeadingDeviation)));
-		CurrentSpeed = FMath::Min(CurrentSpeed, HeadingSpeedCap);
-	}
 }
 
 void UPowderMovementComponent::UpdateBoost(float DeltaTime)
