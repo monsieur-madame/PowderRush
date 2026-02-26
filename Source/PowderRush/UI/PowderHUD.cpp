@@ -964,6 +964,11 @@ void APowderHUD::BuildDevParamList()
 	Add(TEXT("MaxFOV"),            &Char->MaxFOV,              1.0f,    30.0f,   120.0f);
 	Add(TEXT("FOVInterp"),         &Char->FOVInterpSpeed,      0.05f,   0.1f,    20.0f);
 
+	// -- Carve Feel params --
+	AddHeader(TEXT("-- Carve Feel --"));
+	Add(TEXT("CamCarveRollMax"),   &Char->CameraCarveRollMax,        0.5f,    0.0f,    15.0f);
+	Add(TEXT("CamCarveRollInterp"),&Char->CameraCarveRollInterpSpeed,0.5f,    1.0f,    20.0f);
+
 	// -- Surface params --
 	AddHeader(TEXT("-- Surface --"));
 	Add(TEXT("Friction"),          &MC->CurrentSurface.Friction,          0.1f,    0.0f,    5.0f);

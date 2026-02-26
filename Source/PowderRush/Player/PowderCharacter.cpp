@@ -3,9 +3,8 @@
 #include "Player/PowderTrickComponent.h"
 #include "Scoring/ScoreSubsystem.h"
 #include "Engine/GameInstance.h"
-#include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "UObject/ConstructorHelpers.h"
-#include "Engine/StaticMesh.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Effects/PowderSnowSpray.h"
@@ -17,17 +16,11 @@ APowderCharacter::APowderCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// Skier mesh as root — uses collision set up in the static mesh editor
-	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
+	// Skeletal mesh as root — mesh and Anim BP assigned in editor
+	MeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Mesh"));
 	MeshComp->SetCollisionProfileName(TEXT("Pawn"));
 	MeshComp->SetRelativeScale3D(FVector(1.0f, 1.0f, 1.0f));
 	SetRootComponent(MeshComp);
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> SkierMeshAsset(
-		TEXT("/Game/Skier/Skier.Skier"));
-	if (SkierMeshAsset.Succeeded())
-	{
-		MeshComp->SetStaticMesh(SkierMeshAsset.Object);
-	}
 
 	// Spring arm for three-quarter diorama camera
 	SpringArmComp = CreateDefaultSubobject<USpringArmComponent>(TEXT("SpringArm"));
@@ -180,9 +173,17 @@ void APowderCharacter::UpdateDioramaCamera(float DeltaTime)
 
 	float TargetPitch = FMath::Lerp(BasePitch, SpeedPitch, SpeedNorm);
 
+	// Camera carve roll: subtle bank into turns
+	float MaxCarve = MovementComp->MaxCarveAngle;
+	float CarveFrac = (MaxCarve > KINDA_SMALL_NUMBER)
+		? FMath::Clamp(MovementComp->GetCarveAngle() / MaxCarve, -1.0f, 1.0f)
+		: 0.0f;
+	float TargetCamRoll = -CarveFrac * CameraCarveRollMax;
+	CurrentCameraCarveRoll = FMath::FInterpTo(CurrentCameraCarveRoll, TargetCamRoll, DeltaTime, CameraCarveRollInterpSpeed);
+
 	// Use world rotation so the spring arm isn't compounded with the capsule's yaw
 	FRotator CurrentRot = SpringArmComp->GetComponentRotation();
-	FRotator TargetRot(TargetPitch, TargetYaw, 0.0f);
+	FRotator TargetRot(TargetPitch, TargetYaw, CurrentCameraCarveRoll);
 	SpringArmComp->SetWorldRotation(
 		FMath::RInterpTo(CurrentRot, TargetRot, DeltaTime, CameraYawInterpSpeed));
 

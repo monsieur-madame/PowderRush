@@ -7,7 +7,7 @@
 class UPowderMovementComponent;
 class UPowderTrickComponent;
 class UPowderTuningProfile;
-class UStaticMeshComponent;
+class USkeletalMeshComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UPowderSnowSpray;
@@ -102,6 +102,13 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
 	float FOVInterpSpeed = 3.0f;
 
+	// --- Camera Carve Roll ---
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraCarveRollMax = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraCarveRollInterpSpeed = 4.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	TObjectPtr<UPowderTuningProfile> DefaultTuningProfile;
 
@@ -116,7 +123,7 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UStaticMeshComponent> MeshComp;
+	TObjectPtr<USkeletalMeshComponent> MeshComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
 	TObjectPtr<USpringArmComponent> SpringArmComp;
@@ -142,6 +149,8 @@ protected:
 
 	UFUNCTION()
 	void HandleWipeout();
+
+	float CurrentCameraCarveRoll = 0.0f;
 
 	// Camera tuning blend state
 	bool bIsBlendingCameraTuning = false;

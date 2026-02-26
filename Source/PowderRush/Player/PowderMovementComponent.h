@@ -86,6 +86,15 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
 	float GetGroundNormalStability() const { return GroundNormalStability; }
 
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
+	float GetEdgeDepth() const { return EdgeDepth; }
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
+	float GetCarvePressure() const { return CarvePressure; }
+
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
+	FVector GetSlopeNormal() const { return SlopeNormal; }
+
 	// --- Tuning Profile ---
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement|Tuning")
 	void ApplyTuningProfile(const FMovementTuning& Tuning, float BlendTime);

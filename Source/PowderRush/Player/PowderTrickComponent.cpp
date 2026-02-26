@@ -1,6 +1,6 @@
 #include "Player/PowderTrickComponent.h"
 #include "Player/PowderMovementComponent.h"
-#include "Components/StaticMeshComponent.h"
+#include "Components/MeshComponent.h"
 #include "Scoring/ScoreSubsystem.h"
 #include "Engine/GameInstance.h"
 
@@ -67,7 +67,7 @@ void UPowderTrickComponent::BeginPlay()
 
 	// Cache references
 	CachedMovement = GetOwner()->FindComponentByClass<UPowderMovementComponent>();
-	CachedBodyMesh = GetOwner()->FindComponentByClass<UStaticMeshComponent>();
+	CachedBodyMesh = GetOwner()->FindComponentByClass<UMeshComponent>();
 
 	// Bind to movement delegates
 	if (CachedMovement)
