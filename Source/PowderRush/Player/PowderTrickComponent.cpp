@@ -258,7 +258,7 @@ void UPowderTrickComponent::RestoreBaseRotation()
 {
 	if (CachedBodyMesh && CachedMovement)
 	{
-		CachedBodyMesh->SetWorldRotation(FRotator(0.0f, CachedMovement->GetDesiredYaw(), 0.0f));
+		CachedBodyMesh->SetWorldRotation(FRotator(0.0f, CachedMovement->GetDesiredYaw() + CachedMovement->VisualYawOffset, 0.0f));
 	}
 }
 

@@ -361,16 +361,6 @@ void UPowderMovementComponent::UpdateCarving(float DeltaTime)
 			FMath::Max(0.0f, EffectiveDownhillAlign) * DeltaTime);
 	}
 
-	// Heading-projected speed: project speed onto new heading direction.
-	// Small carves: cos(small angle) ≈ 1 → almost no loss.
-	// Hard 90° carve: cos(90°) = 0 → speed drops to zero.
-	// Trying to go uphill: speed rapidly drains.
-	{
-		float YawDelta = FMath::FindDeltaAngleDegrees(PrevYaw, DesiredYaw);
-		float CosProjection = FMath::Cos(FMath::DegreesToRadians(YawDelta));
-		CurrentSpeed *= FMath::Max(0.0f, CosProjection);
-	}
-
 	LastTurnRateDegPerSec = (DeltaTime > KINDA_SMALL_NUMBER)
 		? FMath::Abs(FMath::FindDeltaAngleDegrees(PrevYaw, DesiredYaw)) / DeltaTime
 		: 0.0f;
@@ -504,7 +494,7 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 	FRotator DesiredRotation = UpdatedComponent->GetComponentRotation();
 	DesiredRotation.Pitch = 0.0f;
 	DesiredRotation.Roll = 0.0f;
-	DesiredRotation.Yaw = VisualYaw;
+	DesiredRotation.Yaw = VisualYaw + VisualYawOffset;
 
 	FHitResult Hit;
 	UpdatedComponent->MoveComponent(TotalMovement, DesiredRotation, true, &Hit);
@@ -595,6 +585,27 @@ void UPowderMovementComponent::InitializeHeading(const FVector& CourseDirection)
 	DesiredYaw = Dir.Rotation().Yaw;
 	VisualYaw = DesiredYaw;
 	bHeadingInitialized = true;
+
+	if (!UpdatedComponent)
+	{
+		return;
+	}
+
+	// Apply rotation immediately so the mesh faces correctly even while frozen
+	FRotator Rot = UpdatedComponent->GetComponentRotation();
+	Rot.Yaw = VisualYaw + VisualYawOffset;
+	UpdatedComponent->SetWorldRotation(Rot);
+
+	// Snap to terrain so the character doesn't float while frozen at spawn
+	FVector Loc = UpdatedComponent->GetComponentLocation();
+	FVector TraceStart = Loc + FVector(0.0f, 0.0f, 400.0f);
+	FVector TraceEnd = TraceStart - FVector(0.0f, 0.0f, 400.0f + TerrainTraceDistance);
+	FHitResult Hit;
+	if (TraceForTaggedTerrain(TraceStart, TraceEnd, Hit) && Hit.ImpactNormal.Z > MinGroundNormalZ)
+	{
+		float DesiredZ = Hit.ImpactPoint.Z + GetOwnerCapsuleHalfHeight() + TerrainContactOffset;
+		UpdatedComponent->SetWorldLocation(FVector(Loc.X, Loc.Y, DesiredZ));
+	}
 }
 
 void UPowderMovementComponent::SetFrozen(bool bFreeze)
@@ -825,11 +836,13 @@ IPowderSurfaceQueryProvider* UPowderMovementComponent::ResolveSurfaceQueryProvid
 
 float UPowderMovementComponent::GetOwnerCapsuleHalfHeight() const
 {
-	// Derive half-height from the UpdatedComponent's collision bounds (works with any collision shape)
+	// Derive the distance from the component pivot to the bottom of its bounding box.
+	// Center pivot: Origin.Z=0, Extent.Z=half → returns half (correct).
+	// Bottom pivot: Origin.Z=half, Extent.Z=half → returns 0 (correct).
 	if (UpdatedComponent)
 	{
 		FBoxSphereBounds Bounds = UpdatedComponent->CalcBounds(FTransform::Identity);
-		return Bounds.BoxExtent.Z;
+		return Bounds.BoxExtent.Z - Bounds.Origin.Z;
 	}
 
 	return 90.0f;
@@ -1007,3 +1020,4 @@ void UPowderMovementComponent::TickSurfaceBlend(float DeltaTime)
 		bIsBlendingSurface = false;
 	}
 }
+

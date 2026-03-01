@@ -131,31 +131,31 @@ public:
 	float MaxAccelerationSlopeAngle = 28.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float MaxSpeed = 3000.0f;
+	float MaxSpeed = 2300.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float BaseFriction = 0.02f;
+	float BaseFriction = 0.025f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveSpeedBleed = 0.5f;
+	float CarveSpeedBleed = 0.85f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveRate = 3.0f;
+	float CarveRate = 2.1f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveReturnRate = 0.5f;
+	float CarveReturnRate = 0.35f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float MaxCarveAngle = 90.0f;
+	float MaxCarveAngle = 58.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float YawRate = 90.0f;  // Degrees per second at full carve input
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveLateralSpeed = 1400.0f;
+	float CarveLateralSpeed = 520.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveBleedSmoothing = 1.5f;  // How fast speed penalty ramps up/down (lower = smoother transitions)
+	float CarveBleedSmoothing = 4.5f;  // How fast speed penalty ramps up/down (lower = smoother transitions)
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float BoostFillRate = 0.3f;
@@ -180,25 +180,29 @@ public:
 	float OllieCooldown = 1.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveInputSmoothing = 10.0f;
+	float CarveInputSmoothing = 6.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveRampTime = 0.25f;
+	float CarveRampTime = 0.38f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveRampMinIntensity = 0.5f;
+	float CarveRampMinIntensity = 0.22f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveRampEaseExponent = 1.5f;
+	float CarveRampEaseExponent = 1.8f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float SpeedTurnLimitFactor = 0.5f;
+	float SpeedTurnLimitFactor = 0.80f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float MinTurnAngleAtMaxSpeed = 30.0f;
+	float MinTurnAngleAtMaxSpeed = 18.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float YawSmoothing = 0.0f;
+
+	/** Extra yaw added to the visual rotation to correct mesh facing direction (e.g. -90 or 90). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float VisualYawOffset = -90.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float SlopeForwardInterpSpeed = 10.0f;
@@ -210,45 +214,45 @@ public:
 	float GroundNormalFilterSpeed = 12.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float DownhillAlignRate = 55.0f;
+	float DownhillAlignRate = 38.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float TurnRateLimitDegPerSec = 220.0f;
+	float TurnRateLimitDegPerSec = 155.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveBleedExponent = 1.8f;
+	float CarveBleedExponent = 1.40f;
 
 	// --- Ski Feel ---
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float SpeedTurnRateMin = 0.35f;
+	float SpeedTurnRateMin = 0.24f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float SpeedTurnRateExponent = 1.2f;
+	float SpeedTurnRateExponent = 1.35f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float EdgeEngageRate = 6.0f;
+	float EdgeEngageRate = 3.8f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float EdgeDisengageRate = 4.0f;
+	float EdgeDisengageRate = 2.6f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float EdgeMinDepth = 0.3f;
+	float EdgeMinDepth = 0.18f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float HeadingTraverseFactor = 0.15f;
+	float HeadingTraverseFactor = 0.00f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float HeadingUphillFactor = -0.3f;
+	float HeadingUphillFactor = -0.65f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float HeadingFrictionScale = 0.5f;
+	float HeadingFrictionScale = 1.15f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float TurnCommitTime = 0.2f;
+	float TurnCommitTime = 0.28f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float TurnCommitDecay = 0.3f;
+	float TurnCommitDecay = 0.45f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float LandingSpeedPenaltyMax = 0.4f;
@@ -279,22 +283,22 @@ public:
 	// --- Edge Feel ---
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float EdgeTransitionTime = 0.06f;
+	float EdgeTransitionTime = 0.09f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float EdgeTransitionGrip = 0.15f;
+	float EdgeTransitionGrip = 0.10f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarvePressureBuildRate = 1.5f;
+	float CarvePressureBuildRate = 1.2f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarvePressureDecayRate = 3.0f;
+	float CarvePressureDecayRate = 2.2f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarvePressureTurnBonus = 0.15f;
+	float CarvePressureTurnBonus = 0.08f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarvePressureBleedBonus = 0.2f;
+	float CarvePressureBleedBonus = 0.45f;
 
 	// --- Equipment Stats (applied from equipped gear) ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Equipment")

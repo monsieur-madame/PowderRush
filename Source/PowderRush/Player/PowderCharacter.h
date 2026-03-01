@@ -11,6 +11,7 @@ class USkeletalMeshComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UPowderSnowSpray;
+class UAnimSequence;
 
 UCLASS()
 class POWDERRUSH_API APowderCharacter : public APawn
@@ -142,6 +143,9 @@ protected:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Character")
 	ERiderType RiderType = ERiderType::Snowboarder;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
+	TObjectPtr<UAnimSequence> DownhillAnimation;
 
 	void UpdateDioramaCamera(float DeltaTime);
 	void UpdateSnowSpray();
