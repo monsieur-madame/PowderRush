@@ -755,11 +755,13 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 	UpdatedComponent->MoveComponent(Movement, CurrentRotation, true, &Hit);
 
 	bool bLanded = false;
+	FVector LandingSurfaceNormal = SlopeNormal; // Will be updated with actual landing surface
 
 	// Check for landing: blocking hit with upward-facing surface (obstacle or non-slope geometry)
 	if (Hit.IsValidBlockingHit() && Hit.ImpactNormal.Z > MinGroundNormalZ)
 	{
 		bLanded = true;
+		LandingSurfaceNormal = Hit.ImpactNormal;
 	}
 
 	// Trace-based landing fallback: slopes ignore Pawn sweeps to prevent seam collision,
@@ -782,6 +784,7 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 				FVector SnapDelta(0.0f, 0.0f, GroundZ - CurrentPos.Z);
 				UpdatedComponent->MoveComponent(SnapDelta, CurrentRotation, true);
 				bLanded = true;
+				LandingSurfaceNormal = TraceHit.ImpactNormal;
 			}
 		}
 	}
@@ -790,17 +793,34 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 	{
 		bIsAirborne = false;
 
+		// Update SlopeNormal to actual landing surface so terrain following resumes correctly
+		SlopeNormal = LandingSurfaceNormal;
+
+		// Reset visual lean/pitch so the first ground tick doesn't snap to stale pre-flight values
+		SmoothedCarveLean = 0.0f;
+		SmoothedSlopePitch = 0.0f;
+
 		// Start landing blend
 		bIsLandingBlend = true;
 		LandingBlendTimer = LandingBlendDuration;
 
-		// --- Landing quality assessment (Feature 5) ---
-		// Perfect landing: velocity parallel to slope (dot with normal ~ 0)
-		// Bad landing: velocity into ground (dot with normal ~ -1)
-		FVector VelocityDir = AirborneVelocity.GetSafeNormal();
-		float LandingDot = FVector::DotProduct(VelocityDir, SlopeNormal);
-		// Map: dot 0 (parallel) → quality 1.0, dot -1 (into ground) → quality 0.0
-		float LandingQuality = FMath::Clamp(1.0f + LandingDot, 0.0f, 1.0f);
+		// --- Physics-based landing (velocity projection onto slope) ---
+		// Decompose airborne velocity into slope-parallel and slope-perpendicular components.
+		// Parallel component = post-landing speed (vertical velocity converts to forward speed on slopes).
+		// Perpendicular component = impact force (determines penalty).
+		float NormalComponent = FVector::DotProduct(AirborneVelocity, LandingSurfaceNormal);
+		FVector ImpactVelocity = NormalComponent * LandingSurfaceNormal;
+		FVector SlopeParallelVelocity = AirborneVelocity - ImpactVelocity;
+
+		float SlopeParallelSpeed = SlopeParallelVelocity.Size();
+		float ImpactSpeed = FMath::Abs(NormalComponent);
+
+		// Landing quality based on how much velocity is impact vs glide.
+		// Low impact relative to total speed = smooth landing.
+		float TotalSpeed = AirborneVelocity.Size();
+		float ImpactRatio = (TotalSpeed > 1.0f) ? (ImpactSpeed / TotalSpeed) : 0.0f;
+		// Map: ratio 0 (pure glide) → quality 1.0, ratio 1 (straight into ground) → quality 0.0
+		float LandingQuality = FMath::Clamp(1.0f - ImpactRatio, 0.0f, 1.0f);
 
 		// Apply threshold: above threshold = perfect (no penalty)
 		if (LandingQuality >= LandingQualityThreshold)
@@ -815,17 +835,15 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 				LandingQuality);
 		}
 
-		// Restore speed from horizontal component with landing penalty
-		FVector HorizontalVel(AirborneVelocity.X, AirborneVelocity.Y, 0.0f);
-		float HorizontalSpeed = HorizontalVel.Size();
+		// Post-landing speed from slope-parallel projection with impact absorption penalty
 		float SpeedPenalty = (1.0f - LandingQuality) * LandingSpeedPenaltyMax;
-		CurrentSpeed = FMath::Clamp(HorizontalSpeed * (1.0f - SpeedPenalty), 0.0f, MaxSpeed);
+		CurrentSpeed = FMath::Clamp(SlopeParallelSpeed * (1.0f - SpeedPenalty), 0.0f, MaxSpeed);
 
-		// Align heading to airborne velocity direction.
-		// Speed projection in UpdateCarving naturally prevents wrong-direction travel.
-		if (HorizontalSpeed > 10.0f)
+		// Align heading to slope-parallel velocity direction
+		FVector SlopeParallelHorizontal(SlopeParallelVelocity.X, SlopeParallelVelocity.Y, 0.0f);
+		if (SlopeParallelHorizontal.SizeSquared() > 100.0f)
 		{
-			DesiredYaw = HorizontalVel.Rotation().Yaw;
+			DesiredYaw = SlopeParallelHorizontal.Rotation().Yaw;
 			VisualYaw = DesiredYaw;
 		}
 

@@ -27,6 +27,7 @@ APowderCharacter::APowderCharacter()
 	// Skeletal mesh as root — mesh and Anim BP assigned in editor
 	MeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Mesh"));
 	MeshComp->SetCollisionProfileName(TEXT("Pawn"));
+	MeshComp->SetGenerateOverlapEvents(true);
 	MeshComp->SetRelativeScale3D(FVector(1.0f, 1.0f, 1.0f));
 	SetRootComponent(MeshComp);
 	static ConstructorHelpers::FObjectFinder<USkeletalMesh> SkierMeshAsset(

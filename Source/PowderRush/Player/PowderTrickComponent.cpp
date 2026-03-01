@@ -88,18 +88,25 @@ void UPowderTrickComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 
 	TrickTimer += DeltaTime;
 
-	// Interpolate visual rotation on body mesh
-	if (CachedBodyMesh && TrickDuration > 0.0f)
+	// Interpolate visual rotation on body mesh — composed in heading frame
+	// so trick axes are always aligned with movement direction regardless of lean/pitch
+	if (CachedBodyMesh && CachedMovement && TrickDuration > 0.0f)
 	{
 		float Alpha = FMath::Clamp(TrickTimer / TrickDuration, 0.0f, 1.0f);
 		// Ease in-out for smoother look
 		float EasedAlpha = FMath::InterpEaseInOut(0.0f, 1.0f, Alpha, 2.0f);
 		// Component-wise Lerp to preserve full 360° rotations (FRotator::Lerp normalizes to [-180,180])
 		FRotator CurrentTrickRot;
-		CurrentTrickRot.Pitch = FMath::Lerp(TrickStartRotation.Pitch, TrickTargetRotation.Pitch, EasedAlpha);
-		CurrentTrickRot.Yaw = FMath::Lerp(TrickStartRotation.Yaw, TrickTargetRotation.Yaw, EasedAlpha);
-		CurrentTrickRot.Roll = FMath::Lerp(TrickStartRotation.Roll, TrickTargetRotation.Roll, EasedAlpha);
-		CachedBodyMesh->SetRelativeRotation(CurrentTrickRot);
+		CurrentTrickRot.Pitch = FMath::Lerp(0.0f, TrickTargetRotation.Pitch, EasedAlpha);
+		CurrentTrickRot.Yaw = FMath::Lerp(0.0f, TrickTargetRotation.Yaw, EasedAlpha);
+		CurrentTrickRot.Roll = FMath::Lerp(0.0f, TrickTargetRotation.Roll, EasedAlpha);
+
+		// Compose: heading → trick → mesh offset
+		// Trick rotation happens in the heading-aligned frame, so Pitch = flip, Yaw = spin
+		FQuat HeadingQuat = FRotator(0.0f, CachedMovement->GetDesiredYaw(), 0.0f).Quaternion();
+		FQuat TrickQuat = CurrentTrickRot.Quaternion();
+		FQuat MeshOffsetQuat = FRotator(0.0f, CachedMovement->VisualYawOffset, 0.0f).Quaternion();
+		CachedBodyMesh->SetWorldRotation((HeadingQuat * TrickQuat * MeshOffsetQuat).Rotator());
 	}
 
 	// Check completion
@@ -135,9 +142,8 @@ bool UPowderTrickComponent::RequestTrick(EPowderGestureDirection Gesture)
 	TrickTimer = 0.0f;
 	TrickDuration = TrickDef->Duration;
 
-	// Set up visual rotation
-	TrickStartRotation = CachedBodyMesh ? CachedBodyMesh->GetRelativeRotation() : FRotator::ZeroRotator;
-	TrickTargetRotation = TrickStartRotation + TrickDef->SpinRotation;
+	// Store spin rotation — applied in heading frame during tick (not relative to current rotation)
+	TrickTargetRotation = TrickDef->SpinRotation;
 
 	return true;
 }
@@ -258,7 +264,10 @@ void UPowderTrickComponent::RestoreBaseRotation()
 {
 	if (CachedBodyMesh && CachedMovement)
 	{
-		CachedBodyMesh->SetWorldRotation(FRotator(0.0f, CachedMovement->GetDesiredYaw() + CachedMovement->VisualYawOffset, 0.0f));
+		// Compose heading + mesh offset (no tilt — consistent with trick frame)
+		FQuat HeadingQuat = FRotator(0.0f, CachedMovement->GetDesiredYaw(), 0.0f).Quaternion();
+		FQuat MeshOffsetQuat = FRotator(0.0f, CachedMovement->VisualYawOffset, 0.0f).Quaternion();
+		CachedBodyMesh->SetWorldRotation((HeadingQuat * MeshOffsetQuat).Rotator());
 	}
 }
 
