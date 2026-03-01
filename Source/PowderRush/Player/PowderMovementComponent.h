@@ -52,6 +52,13 @@ public:
 	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
 	bool IsAirborne() const { return bIsAirborne; }
 
+	UFUNCTION(BlueprintPure, Category = "PowderRush|Movement")
+	float GetAirborneTime() const { return AirborneTimer; }
+
+	/** Add impulse while already airborne (e.g. ollie+ramp combo). */
+	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
+	void AddAirborneImpulse(FVector Impulse);
+
 	UFUNCTION(BlueprintCallable, Category = "PowderRush|Movement")
 	void LaunchIntoAir(FVector AdditionalVelocity);
 
@@ -137,7 +144,7 @@ public:
 	float BaseFriction = 0.025f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveSpeedBleed = 0.85f;
+	float CarveSpeedBleed = 0.70f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float CarveRate = 2.1f;
@@ -146,13 +153,13 @@ public:
 	float CarveReturnRate = 0.35f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float MaxCarveAngle = 58.0f;
+	float MaxCarveAngle = 50.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float YawRate = 90.0f;  // Degrees per second at full carve input
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float CarveLateralSpeed = 520.0f;
+	float CarveLateralSpeed = 700.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float CarveBleedSmoothing = 4.5f;  // How fast speed penalty ramps up/down (lower = smoother transitions)
@@ -214,10 +221,10 @@ public:
 	float GroundNormalFilterSpeed = 12.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float DownhillAlignRate = 38.0f;
+	float DownhillAlignRate = 28.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float TurnRateLimitDegPerSec = 155.0f;
+	float TurnRateLimitDegPerSec = 130.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float CarveBleedExponent = 1.40f;
@@ -234,13 +241,13 @@ public:
 	float EdgeEngageRate = 3.8f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float EdgeDisengageRate = 2.6f;
+	float EdgeDisengageRate = 1.8f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float EdgeMinDepth = 0.18f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
-	float HeadingTraverseFactor = 0.00f;
+	float HeadingTraverseFactor = 0.15f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float HeadingUphillFactor = -0.65f;
@@ -271,6 +278,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float TerrainSnapThreshold = 3.0f;
 
+	/** Height drop (cm) that triggers automatic airborne transition (ramp lips, ledges). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float LedgeLaunchThreshold = 50.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float LandingBlendDuration = 0.15f;
 
@@ -279,6 +290,17 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
 	float AirTerminalVelocity = 1500.0f;
+
+	// --- Carve Lean & Slope Pitch ---
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarveLeanMaxAngle = 25.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float CarveLeanInterpSpeed = 6.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Movement|Tuning")
+	float SlopePitchInterpSpeed = 8.0f;
 
 	// --- Edge Feel ---
 
@@ -338,6 +360,13 @@ protected:
 	float VisualYaw = 0.0f;
 	float LastTurnRateDegPerSec = 0.0f;
 	float GroundNormalStability = 1.0f;
+
+	// Ground vertical velocity (gravity-based terrain following)
+	float GroundVerticalVelocity = 0.0f;
+
+	// Visual lean/pitch state
+	float SmoothedCarveLean = 0.0f;
+	float SmoothedSlopePitch = 0.0f;
 
 	// Ski feel state
 	float EdgeDepth = 0.0f;

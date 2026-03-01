@@ -181,13 +181,53 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 			}
 		}
 
-		// Snap to terrain surface — deadzone prevents micro-jitter on mesh seams
+		// Gravity-based terrain following: only snap UP, let gravity handle downward
 		float DesiredHeight = Hit.ImpactPoint.Z + CapsuleHalfHeight + TerrainContactOffset;
 		float HeightDelta = DesiredHeight - CurrentLocation.Z;
-		if (FMath::Abs(HeightDelta) > TerrainSnapThreshold)
+
+		if (HeightDelta > TerrainSnapThreshold)
 		{
+			// Terrain is above us (going uphill / riding up ramp) — snap up to stay on surface
 			FVector HeightAdjust = FVector(0.0f, 0.0f, HeightDelta);
 			UpdatedComponent->MoveComponent(HeightAdjust, UpdatedComponent->GetComponentRotation(), true);
+			GroundVerticalVelocity = 0.0f;
+		}
+		else if (HeightDelta >= -TerrainSnapThreshold)
+		{
+			// Within snap threshold — solidly on ground
+			GroundVerticalVelocity = 0.0f;
+		}
+		else
+		{
+			// Terrain is below us (drop, bump, ramp lip) — let gravity pull us down naturally
+			// Inherit upward velocity from slope movement on first frame of separation
+			if (GroundVerticalVelocity >= 0.0f && Velocity.Z > 0.0f)
+			{
+				GroundVerticalVelocity = Velocity.Z;
+			}
+			GroundVerticalVelocity -= GravityAcceleration * DeltaTime;
+
+			float VerticalMove = GroundVerticalVelocity * DeltaTime;
+
+			// Don't go below the terrain surface
+			if (VerticalMove < HeightDelta)
+			{
+				VerticalMove = HeightDelta;
+				GroundVerticalVelocity = 0.0f; // Settled back on terrain
+			}
+
+			UpdatedComponent->MoveComponent(
+				FVector(0.0f, 0.0f, VerticalMove),
+				UpdatedComponent->GetComponentRotation(), true);
+
+			// If separated enough, transition to full airborne physics
+			float Separation = (CurrentLocation.Z + VerticalMove) - DesiredHeight;
+			if (Separation > LedgeLaunchThreshold)
+			{
+				LaunchIntoAir(FVector(0.0f, 0.0f, GroundVerticalVelocity));
+				GroundVerticalVelocity = 0.0f;
+				return;
+			}
 		}
 
 		// Initialize heading from slope on first ground contact
@@ -210,9 +250,20 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 	}
 	else
 	{
-		// No valid terrain hit — apply gravity so the character settles onto terrain
+		// No valid terrain hit — go airborne with current velocity
 		bOnGround = false;
 		GroundNormalStability = FMath::FInterpTo(GroundNormalStability, 0.0f, DeltaTime, 4.0f);
+
+		if (CurrentSpeed > 50.0f)
+		{
+			// Moving with speed — transition to full airborne physics
+			float LaunchZ = FMath::Max(GroundVerticalVelocity, Velocity.Z);
+			LaunchIntoAir(FVector(0.0f, 0.0f, FMath::Max(0.0f, LaunchZ)));
+			GroundVerticalVelocity = 0.0f;
+			return;
+		}
+
+		// Stationary / very slow — just apply gravity to settle
 		FVector GravityDrop = FVector(0.0f, 0.0f, -GravityAcceleration * DeltaTime);
 		UpdatedComponent->MoveComponent(GravityDrop, UpdatedComponent->GetComponentRotation(), true);
 	}
@@ -490,11 +541,33 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 		VisualYaw = DesiredYaw;
 	}
 
-	// Rotate capsule to face heading — Yaw only
-	FRotator DesiredRotation = UpdatedComponent->GetComponentRotation();
-	DesiredRotation.Pitch = 0.0f;
-	DesiredRotation.Roll = 0.0f;
-	DesiredRotation.Yaw = VisualYaw + VisualYawOffset;
+	// --- Compute lean and pitch in movement space, then compose with mesh offset ---
+
+	// Slope cross-tilt: lean into the hill when traversing across a slope
+	FVector CharForward = FRotator(0.0f, DesiredYaw, 0.0f).Vector();
+	FVector CharRight = FVector::CrossProduct(FVector::UpVector, CharForward).GetSafeNormal();
+	float SlopeLateralComponent = FVector::DotProduct(SlopeNormal, CharRight);
+	float SlopeRoll = -FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(SlopeLateralComponent, -1.0f, 1.0f)));
+
+	// Carve lean: additional roll into the turn, scaled by edge depth and speed
+	float CarveNorm = CurrentCarveAngle / FMath::Max(1.0f, MaxCarveAngle);
+	float SpeedLeanScale = FMath::Clamp(CurrentSpeed / FMath::Max(1.0f, MaxSpeed), 0.2f, 1.0f);
+	float CarveLean = -CarveNorm * CarveLeanMaxAngle * SpeedLeanScale;
+
+	float TargetLean = SlopeRoll + CarveLean;
+	SmoothedCarveLean = FMath::FInterpTo(SmoothedCarveLean, TargetLean, DeltaTime, CarveLeanInterpSpeed);
+
+	// Slope-aligned pitch: project movement direction onto slope plane
+	FVector MoveOnSlope = FVector::VectorPlaneProject(CharForward, SlopeNormal).GetSafeNormal();
+	float SlopePitch = FMath::RadiansToDegrees(FMath::Asin(MoveOnSlope.Z));
+	SmoothedSlopePitch = FMath::FInterpTo(SmoothedSlopePitch, SlopePitch, DeltaTime, SlopePitchInterpSpeed);
+
+	// Compose rotation: heading tilt (pitch/roll in movement frame) then mesh offset
+	// This ensures lean/pitch axes are correct regardless of VisualYawOffset
+	FQuat HeadingQuat = FRotator(0.0f, VisualYaw, 0.0f).Quaternion();
+	FQuat TiltQuat = FRotator(SmoothedSlopePitch, 0.0f, SmoothedCarveLean).Quaternion();
+	FQuat MeshOffsetQuat = FRotator(0.0f, VisualYawOffset, 0.0f).Quaternion();
+	FRotator DesiredRotation = (HeadingQuat * TiltQuat * MeshOffsetQuat).Rotator();
 
 	FHitResult Hit;
 	UpdatedComponent->MoveComponent(TotalMovement, DesiredRotation, true, &Hit);
@@ -569,6 +642,9 @@ void UPowderMovementComponent::ResetMovementState()
 	bInEdgeTransition = false;
 	LastCarveSign = 0;
 	CarvePressure = 0.0f;
+	SmoothedCarveLean = 0.0f;
+	SmoothedSlopePitch = 0.0f;
+	GroundVerticalVelocity = 0.0f;
 	Velocity = FVector::ZeroVector;
 	SlopeForward = FVector::ForwardVector;
 	SlopeNormal = FVector::UpVector;
@@ -643,6 +719,15 @@ void UPowderMovementComponent::LaunchIntoAir(FVector AdditionalVelocity)
 	AirborneVelocity = Velocity + AdditionalVelocity;
 
 	OnLaunched.Broadcast();
+}
+
+void UPowderMovementComponent::AddAirborneImpulse(FVector Impulse)
+{
+	if (!bIsAirborne)
+	{
+		return;
+	}
+	AirborneVelocity += Impulse;
 }
 
 void UPowderMovementComponent::UpdateAirborne(float DeltaTime)

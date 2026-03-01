@@ -44,12 +44,18 @@ APowderJump::APowderJump()
 	RampMesh->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	RampMesh->SetCollisionResponseToAllChannels(ECR_Block);
 	RampMesh->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	RampMesh->ComponentTags.Add(FName(TEXT("PowderTerrain")));
 
-	// Launch trigger: matches ramp footprint exactly, rotated to align with ramp surface
+	// Launch trigger: thin strip at the ramp lip (top edge) — player goes airborne when crossing it
 	// Attached to SceneRoot (not RampMesh) so extents are in world-scale units
 	LaunchTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("LaunchTrigger"));
 	LaunchTrigger->SetupAttachment(SceneRoot);
-	LaunchTrigger->SetBoxExtent(FVector(RampLength * 0.5f, RampWidth * 0.5f, 100.0f));
+	float TriggerDepth = 60.0f; // Thin strip at the lip
+	LaunchTrigger->SetBoxExtent(FVector(TriggerDepth * 0.5f, RampWidth * 0.5f, 100.0f));
+	// Position at the ramp lip (top edge) in SceneRoot space
+	float LipX = FMath::Cos(FMath::DegreesToRadians(RampAngle)) * RampLength * 0.5f;
+	float LipZ = FMath::Sin(FMath::DegreesToRadians(RampAngle)) * RampLength * 0.5f;
+	LaunchTrigger->SetRelativeLocation(FVector(LipX, 0.0f, LipZ));
 	LaunchTrigger->SetRelativeRotation(FRotator(RampAngle, 0.0f, 0.0f));
 	LaunchTrigger->SetCollisionProfileName(TEXT("OverlapAllDynamic"));
 	LaunchTrigger->SetCollisionEnabled(ECollisionEnabled::QueryOnly);
@@ -92,9 +98,9 @@ void APowderJump::OnLaunchTriggerOverlap(
 		return;
 	}
 
-	// Launch upward with a fraction of current speed
-	float LaunchSpeed = MovementComp->GetCurrentSpeed() * LaunchSpeedMultiplier;
-	FVector LaunchVelocity = FVector(0.0f, 0.0f, LaunchSpeed);
-	MovementComp->LaunchIntoAir(LaunchVelocity);
+	// Natural launch: transition to airborne preserving current velocity (which already has
+	// upward component from riding up the ramp slope). No forced impulse — the arc comes
+	// from the ramp geometry itself.
+	MovementComp->LaunchIntoAir(FVector::ZeroVector);
 	LastLaunchTime = Now;
 }

@@ -1,6 +1,6 @@
 # PowderRush - Project Status & Roadmap
 
-Last updated: 2026-02-22
+Last updated: 2026-03-01
 
 ---
 
@@ -21,10 +21,13 @@ Last updated: 2026-02-22
   - Ollie: upward impulse with cooldown
   - Airborne physics: drag, terminal velocity, landing blend
   - Landing penalties: speed loss + temporary steering reduction + quality scoring
-  - Terrain following: line trace, ground normal filtering, snap threshold
+  - Terrain following: line trace, ground normal filtering, gravity-based (snap up only, gravity handles drops/bumps/ramp lips naturally via GroundVerticalVelocity)
   - Surface property blending (smooth transitions between surface types)
   - Tuning profile blending (smooth transitions between movement feel presets)
   - Heading system: downhill alignment, yaw lag, heading-based friction
+  - Visual carve lean: quaternion-composed roll into turns (slope cross-tilt + carve depth + speed scaled)
+  - Slope-aligned pitch: character pitches forward on steep terrain, levels on flats
+  - Additive airborne impulse: `AddAirborneImpulse()` for combining ollie + ramp forces
 - **PowderTrickComponent** — 5 trick types (backflip, frontflip, heli-spin L/R, spread eagle)
   - Gesture recognition (swipe up/down/left/right, two-finger hold)
   - Mesh rotation with eased interpolation, component-wise lerp for 360 spins
@@ -39,6 +42,9 @@ Last updated: 2026-02-22
   - State-gated (only processes input in Running state)
 - **PowderCharacter** — static mesh skier, spring arm camera, snow spray Niagara component
   - Camera: arm length, pitch, FOV, yaw lag — all speed-responsive
+  - Camera height offset (TargetOffset.Z) prevents terrain clipping
+  - Camera collision test enabled (bDoCollisionTest = true)
+  - Slope-reactive camera pitch: dips on steep terrain, rises on flats (CameraSlopePitchInfluence)
   - Feel preset ladder: 5 tuning profiles loaded, switchable via dev menu
 
 ### Terrain & Course
@@ -104,7 +110,11 @@ Last updated: 2026-02-22
 ### Obstacles
 - **PowderTree** — trunk + foliage + snow cap mesh components
 - **PowderRock** — cube clusters with snow cover
-- **PowderJump** — launch trigger with speed multiplier
+- **PowderJump** — natural ski jump ramp with lip trigger
+  - PowderTerrain-tagged mesh: terrain following rides player up the ramp surface
+  - Lip trigger: thin strip at ramp top edge, transitions to airborne with zero impulse (natural velocity arc)
+  - Ollie combo: ollie on the ramp adds pop on top of natural trajectory
+  - Tunable: RampLength, RampWidth, RampHeight (auto-calculates pitch angle)
 
 ### Content Assets
 - 1 playable level (TestSlope)
@@ -138,7 +148,7 @@ These systems are implemented and functional but not wired to anything that trig
 | **Tree thread scoring** | Designed in game-plan.md (near-miss both sides, 100 pts + 1.0x) | No implementation; depends on near-miss detection |
 | **Clean section scoring** | Designed in game-plan.md (200 pts for crashless zone) | No zone tracking or clean-section detection |
 | **Distance scoring** | `ScoreSubsystem::AddDistance()` accumulates distance | Nothing calls it during gameplay |
-| **Air time bonus** | `ScoreSubsystem::TrackAirTime()` with 0.2x multiplier bonus | Scoring infrastructure ready; not triggered from movement component |
+| **Air time bonus** | `ScoreSubsystem::AwardAirTimeBonus()` with bonus points per second | Triggered from `UPowderTrickComponent::OnLanded()` for airtime >= 1.0s |
 
 ---
 

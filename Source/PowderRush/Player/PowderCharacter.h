@@ -103,6 +103,17 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
 	float FOVInterpSpeed = 3.0f;
 
+	/** Vertical offset for the spring arm target, raises the camera pivot above the character. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraHeightOffset = 200.0f;
+
+	/** How much the terrain slope angle influences camera pitch (0=none, 1=full slope angle added). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraSlopePitchInfluence = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraSlopePitchInterpSpeed = 3.0f;
+
 	// --- Camera Carve Roll ---
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
 	float CameraCarveRollMax = 3.0f;
@@ -155,6 +166,7 @@ protected:
 	void HandleWipeout();
 
 	float CurrentCameraCarveRoll = 0.0f;
+	float SmoothedCameraSlopePitch = 0.0f;
 
 	// Camera tuning blend state
 	bool bIsBlendingCameraTuning = false;

@@ -45,11 +45,11 @@ public:
 
 	/** Initial avalanche speed (cm/s). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Avalanche")
-	float BaseSpeed = 800.0f;
+	float BaseSpeed = 500.0f;
 
 	/** Speed increase per second of run time (cm/s^2). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Avalanche")
-	float AccelerationRate = 15.0f;
+	float AccelerationRate = 10.0f;
 
 	/** Maximum avalanche speed (cm/s). */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Avalanche")

@@ -49,7 +49,10 @@ APowderCharacter::APowderCharacter()
 	SpringArmComp->bUsePawnControlRotation = false;
 	SpringArmComp->bEnableCameraLag = false;
 	SpringArmComp->bEnableCameraRotationLag = false;
-	SpringArmComp->bDoCollisionTest = false;
+	SpringArmComp->bDoCollisionTest = true;
+	SpringArmComp->ProbeSize = 20.0f;
+	SpringArmComp->ProbeChannel = ECC_WorldStatic;
+	SpringArmComp->TargetOffset = FVector(0.0f, 0.0f, 200.0f);
 
 	// Camera
 	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
@@ -212,6 +215,9 @@ void APowderCharacter::UpdateDioramaCamera(float DeltaTime)
 
 	float SpeedNorm = MovementComp->GetSpeedNormalized();
 
+	// Dynamic height offset
+	SpringArmComp->TargetOffset.Z = CameraHeightOffset;
+
 	// Arm length: pulls back at speed
 	float TargetArmLength = FMath::Lerp(BaseArmLength, MaxArmLength, SpeedNorm);
 	SpringArmComp->TargetArmLength = FMath::FInterpTo(
@@ -230,6 +236,14 @@ void APowderCharacter::UpdateDioramaCamera(float DeltaTime)
 	float TargetYaw = FMath::Lerp(FollowYaw, LeadYaw + LookAheadYaw, FMath::Clamp(CameraTurnLeadWeight, 0.0f, 1.0f)) + BaseYawOffset;
 
 	float TargetPitch = FMath::Lerp(BasePitch, SpeedPitch, SpeedNorm);
+
+	// Slope pitch influence: camera dips on steep terrain, rises on flats
+	FVector SlopeNorm = MovementComp->GetSlopeNormal();
+	float SlopeCosAngle = FVector::DotProduct(SlopeNorm, FVector::UpVector);
+	float SlopeAngleDeg = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(SlopeCosAngle, 0.0f, 1.0f)));
+	float SlopePitchAdjust = -SlopeAngleDeg * CameraSlopePitchInfluence;
+	SmoothedCameraSlopePitch = FMath::FInterpTo(SmoothedCameraSlopePitch, SlopePitchAdjust, DeltaTime, CameraSlopePitchInterpSpeed);
+	TargetPitch += SmoothedCameraSlopePitch;
 
 	// Camera carve roll: subtle bank into turns
 	float MaxCarve = MovementComp->MaxCarveAngle;
