@@ -55,8 +55,8 @@ PowderRush/
 
 ### Key Classes
 - `APowderGameMode` - Main game mode, run lifecycle (state machine: InMenu→Starting→Running→Paused/WipedOut→ScoreScreen)
-- `APowderCharacter` - Player character with Skier mesh, diorama camera, snow spray
-- `UPowderMovementComponent` - Custom physics-based movement (CORE SYSTEM), freeze support, ollie, tuning profile blending
+- `APowderCharacter` - Player character with Skier mesh, diorama camera (height offset, collision test, slope-reactive pitch), snow spray
+- `UPowderMovementComponent` - Custom physics-based movement (CORE SYSTEM), gravity-based terrain following (snap up only, gravity handles drops), freeze support, ollie, tuning profile blending, visual carve lean + slope pitch (quaternion-composed rotation), additive airborne impulse
 - `APowderPlayerController` - Touch + keyboard input, binary left/right carve with ease-in ramp, gesture tricks, double-tap ollie
 - `UPowderGameInstance` - Persistent game state, save/load via UPowderSaveGame, lifetime stats
 - `UScoreSubsystem` - Scoring, combo tracking, run stats (Game Instance Subsystem)
@@ -65,6 +65,7 @@ PowderRush/
 - `APowderHUD` - Canvas-based HUD with button hit-testing, menus (main/pause/stats/score), gameplay overlay, single-column dev tuning menu
 - `APowderEnvironmentSetup` - Spawns lighting, sky, fog and weather components
 - `APowderFinishLine` - Finish line trigger (tall box to catch airborne players)
+- `APowderJump` - Ski jump ramp (PowderTerrain-tagged mesh, lip trigger for natural airborne transition, ollie combo support)
 - `APowderPowerup` - Speed boost + score multiplier pickups
 - `UPowderWeatherManager` - ActorComponent managing weather transitions (lighting, fog, sky, snowfall); lerps between `FWeatherConfig` states
 - `ATerrainManager` - Runtime course query service (reads placed `APowderCoursePath` spline in authored levels)
@@ -111,3 +112,6 @@ Phase 3 in progress. Core loop works: menus, skiing, tricks, ollie, powerups, cr
 - Test on device early and often - desktop feel != mobile feel.
 - Keep draw calls low, keep materials simple, keep meshes low-poly.
 - FRotator Lerp normalizes to [-180,180] — use component-wise float Lerp for 360° rotations (see PowderTrickComponent).
+- When VisualYawOffset != 0, capsule local axes differ from movement axes. Use quaternion composition (Heading * Tilt * MeshOffset) for correct lean/pitch — do NOT set Pitch/Roll directly on the rotator (see ApplyMovement).
+- APowderJump ramps must have `PowderTerrain` component tag on their mesh — without it, terrain traces ignore the ramp and players fall through.
+- Terrain following is gravity-based: only snaps UP (uphill/ramps), never teleports down. Drops, bumps, and ramp lips use gravity + inherited slope velocity for natural arcs. Transitions to full airborne when separation exceeds `LedgeLaunchThreshold`.

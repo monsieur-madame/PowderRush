@@ -5,7 +5,7 @@
 #include "PowderTrickComponent.generated.h"
 
 class UPowderMovementComponent;
-class UStaticMeshComponent;
+class UMeshComponent;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnTrickCompleted, EPowderTrickType, TrickType, int32, Points);
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnTrickFailed);
@@ -75,7 +75,7 @@ protected:
 	TObjectPtr<UPowderMovementComponent> CachedMovement;
 
 	UPROPERTY()
-	TObjectPtr<UStaticMeshComponent> CachedBodyMesh;
+	TObjectPtr<UMeshComponent> CachedBodyMesh;
 
 	const FPowderTrickDefinition* FindTrickForGesture(EPowderGestureDirection Gesture) const;
 	void CompleteTrick();

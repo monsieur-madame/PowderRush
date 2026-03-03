@@ -3,9 +3,10 @@
 #include "Player/PowderTrickComponent.h"
 #include "Scoring/ScoreSubsystem.h"
 #include "Engine/GameInstance.h"
-#include "Components/StaticMeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
+#include "Engine/SkeletalMesh.h"
+#include "Animation/AnimSequence.h"
 #include "UObject/ConstructorHelpers.h"
-#include "Engine/StaticMesh.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Camera/CameraComponent.h"
 #include "Effects/PowderSnowSpray.h"
@@ -13,20 +14,31 @@
 #include "Core/PowderGameMode.h"
 #include "Engine/World.h"
 
+namespace
+{
+	const TCHAR* DefaultSkierMeshPath = TEXT("/Game/Skier/SM_Skier.SM_Skier");
+	const TCHAR* DefaultDownhillAnimationPath = TEXT("/Game/Skier/SM_SkierSkier_Rig_Anim_DownhillRide.SM_SkierSkier_Rig_Anim_DownhillRide");
+}
+
 APowderCharacter::APowderCharacter()
 {
 	PrimaryActorTick.bCanEverTick = true;
 
-	// Skier mesh as root — uses collision set up in the static mesh editor
-	MeshComp = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("Mesh"));
+	// Skeletal mesh as root — mesh and Anim BP assigned in editor
+	MeshComp = CreateDefaultSubobject<USkeletalMeshComponent>(TEXT("Mesh"));
 	MeshComp->SetCollisionProfileName(TEXT("Pawn"));
+	MeshComp->SetGenerateOverlapEvents(true);
 	MeshComp->SetRelativeScale3D(FVector(1.0f, 1.0f, 1.0f));
 	SetRootComponent(MeshComp);
-	static ConstructorHelpers::FObjectFinder<UStaticMesh> SkierMeshAsset(
-		TEXT("/Game/Skier/Skier.Skier"));
+	static ConstructorHelpers::FObjectFinder<USkeletalMesh> SkierMeshAsset(
+		DefaultSkierMeshPath);
 	if (SkierMeshAsset.Succeeded())
 	{
-		MeshComp->SetStaticMesh(SkierMeshAsset.Object);
+		MeshComp->SetSkeletalMesh(SkierMeshAsset.Object);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("APowderCharacter: Failed constructor mesh load: %s"), DefaultSkierMeshPath);
 	}
 
 	// Spring arm for three-quarter diorama camera
@@ -38,7 +50,10 @@ APowderCharacter::APowderCharacter()
 	SpringArmComp->bUsePawnControlRotation = false;
 	SpringArmComp->bEnableCameraLag = false;
 	SpringArmComp->bEnableCameraRotationLag = false;
-	SpringArmComp->bDoCollisionTest = false;
+	SpringArmComp->bDoCollisionTest = true;
+	SpringArmComp->ProbeSize = 20.0f;
+	SpringArmComp->ProbeChannel = ECC_WorldStatic;
+	SpringArmComp->TargetOffset = FVector(0.0f, 0.0f, 200.0f);
 
 	// Camera
 	CameraComp = CreateDefaultSubobject<UCameraComponent>(TEXT("Camera"));
@@ -48,7 +63,7 @@ APowderCharacter::APowderCharacter()
 	// Snow spray (Niagara particle system)
 	SnowSprayComp = CreateDefaultSubobject<UPowderSnowSpray>(TEXT("SnowSpray"));
 	SnowSprayComp->SetupAttachment(MeshComp);
-	SnowSprayComp->SetRelativeLocation(FVector(0.0f, 0.0f, -80.0f));
+	SnowSprayComp->SetRelativeLocation(FVector(0.0f, 0.0f, 0.0f));
 
 	// Custom movement
 	MovementComp = CreateDefaultSubobject<UPowderMovementComponent>(TEXT("PowderMovement"));
@@ -56,6 +71,18 @@ APowderCharacter::APowderCharacter()
 
 	// Trick system
 	TrickComp = CreateDefaultSubobject<UPowderTrickComponent>(TEXT("TrickComponent"));
+
+	// Load downhill animation
+	static ConstructorHelpers::FObjectFinder<UAnimSequence> DownhillAnimAsset(
+		DefaultDownhillAnimationPath);
+	if (DownhillAnimAsset.Succeeded())
+	{
+		DownhillAnimation = DownhillAnimAsset.Object;
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("APowderCharacter: Failed to load downhill animation: %s"), DefaultDownhillAnimationPath);
+	}
 
 	// Load default tuning profile
     static ConstructorHelpers::FObjectFinder<UPowderTuningProfile> FeelPreset01(
@@ -100,6 +127,27 @@ void APowderCharacter::BeginPlay()
 {
 	Super::BeginPlay();
 
+	// If a BP/default override cleared the mesh, restore it at runtime.
+	if (MeshComp && !MeshComp->GetSkeletalMeshAsset())
+	{
+		if (USkeletalMesh* RuntimeMesh = LoadObject<USkeletalMesh>(nullptr, DefaultSkierMeshPath))
+		{
+			MeshComp->SetSkeletalMesh(RuntimeMesh);
+			UE_LOG(LogTemp, Display, TEXT("APowderCharacter: Restored mesh in BeginPlay: %s"), DefaultSkierMeshPath);
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("APowderCharacter: Failed BeginPlay mesh load: %s"), DefaultSkierMeshPath);
+		}
+	}
+
+	// Play downhill animation directly (bypasses AnimBP)
+	if (MeshComp && DownhillAnimation)
+	{
+		MeshComp->PlayAnimation(DownhillAnimation, true);
+		UE_LOG(LogTemp, Display, TEXT("APowderCharacter: Playing downhill animation"));
+	}
+
 	// Wire wipeout to scoring system reset
 	if (MovementComp)
 	{
@@ -129,6 +177,13 @@ void APowderCharacter::Tick(float DeltaTime)
 	TickCameraTuningBlend(DeltaTime);
 	UpdateDioramaCamera(DeltaTime);
 	UpdateSnowSpray();
+
+	// Drive animation play rate from movement speed
+	if (MeshComp && MovementComp && DownhillAnimation)
+	{
+		float SpeedNorm = MovementComp->GetSpeedNormalized();
+		MeshComp->SetPlayRate(SpeedNorm);
+	}
 
 	// Drive scoring ticks
 	if (UScoreSubsystem* ScoreSys = GetGameInstance()->GetSubsystem<UScoreSubsystem>())
@@ -161,6 +216,9 @@ void APowderCharacter::UpdateDioramaCamera(float DeltaTime)
 
 	float SpeedNorm = MovementComp->GetSpeedNormalized();
 
+	// Dynamic height offset
+	SpringArmComp->TargetOffset.Z = CameraHeightOffset;
+
 	// Arm length: pulls back at speed
 	float TargetArmLength = FMath::Lerp(BaseArmLength, MaxArmLength, SpeedNorm);
 	SpringArmComp->TargetArmLength = FMath::FInterpTo(
@@ -180,9 +238,25 @@ void APowderCharacter::UpdateDioramaCamera(float DeltaTime)
 
 	float TargetPitch = FMath::Lerp(BasePitch, SpeedPitch, SpeedNorm);
 
+	// Slope pitch influence: camera dips on steep terrain, rises on flats
+	FVector SlopeNorm = MovementComp->GetSlopeNormal();
+	float SlopeCosAngle = FVector::DotProduct(SlopeNorm, FVector::UpVector);
+	float SlopeAngleDeg = FMath::RadiansToDegrees(FMath::Acos(FMath::Clamp(SlopeCosAngle, 0.0f, 1.0f)));
+	float SlopePitchAdjust = -SlopeAngleDeg * CameraSlopePitchInfluence;
+	SmoothedCameraSlopePitch = FMath::FInterpTo(SmoothedCameraSlopePitch, SlopePitchAdjust, DeltaTime, CameraSlopePitchInterpSpeed);
+	TargetPitch += SmoothedCameraSlopePitch;
+
+	// Camera carve roll: subtle bank into turns
+	float MaxCarve = MovementComp->MaxCarveAngle;
+	float CarveFrac = (MaxCarve > KINDA_SMALL_NUMBER)
+		? FMath::Clamp(MovementComp->GetCarveAngle() / MaxCarve, -1.0f, 1.0f)
+		: 0.0f;
+	float TargetCamRoll = -CarveFrac * CameraCarveRollMax;
+	CurrentCameraCarveRoll = FMath::FInterpTo(CurrentCameraCarveRoll, TargetCamRoll, DeltaTime, CameraCarveRollInterpSpeed);
+
 	// Use world rotation so the spring arm isn't compounded with the capsule's yaw
 	FRotator CurrentRot = SpringArmComp->GetComponentRotation();
-	FRotator TargetRot(TargetPitch, TargetYaw, 0.0f);
+	FRotator TargetRot(TargetPitch, TargetYaw, CurrentCameraCarveRoll);
 	SpringArmComp->SetWorldRotation(
 		FMath::RInterpTo(CurrentRot, TargetRot, DeltaTime, CameraYawInterpSpeed));
 
@@ -365,3 +439,4 @@ void APowderCharacter::TickCameraTuningBlend(float DeltaTime)
 		bIsBlendingCameraTuning = false;
 	}
 }
+

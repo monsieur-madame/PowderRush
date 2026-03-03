@@ -61,10 +61,10 @@ protected:
 	float KeyboardHoldDuration = 0.0f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Input|Feel", meta = (ClampMin = "0.0"))
-	float CarveSideSwitchCooldown = 0.04f;
+	float CarveSideSwitchCooldown = 0.085f;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Input|Feel", meta = (ClampMin = "0.0"))
-	float CarveReleaseGraceTime = 0.06f;
+	float CarveReleaseGraceTime = 0.09f;
 
 	UPROPERTY()
 	TObjectPtr<UPowderMovementComponent> CachedMovement;

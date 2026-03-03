@@ -7,6 +7,7 @@
 #include "Core/PowderGameMode.h"
 #include "Core/PowderGameInstance.h"
 #include "Terrain/TerrainManager.h"
+#include "Terrain/PowderAvalancheComponent.h"
 #include "Core/PowderEnvironmentSetup.h"
 #include "Effects/PowderWeatherManager.h"
 #include "Meta/PowderSaveGame.h"
@@ -793,6 +794,43 @@ void APowderHUD::DrawGameplayHUD(float DeltaTime)
 		Y += Gap;
 		DrawText(TEXT("AIRBORNE"), FColor(80, 255, 80), Padding, Y, GEngine->GetSmallFont(), UIScale);
 	}
+
+	// --- Avalanche proximity indicator (bottom-center) ---
+	APowderGameMode* AvalGM = Cast<APowderGameMode>(GetWorld()->GetAuthGameMode());
+	UPowderAvalancheComponent* AvalComp = AvalGM ? AvalGM->GetAvalancheComponent() : nullptr;
+	if (AvalComp && AvalComp->IsAvalancheActive())
+	{
+		float GapNorm = AvalComp->GetGapNormalized();
+
+		float AvalBarWidth = S(300.0f);
+		float AvalBarHeight = S(14.0f);
+		float AvalBarX = (Canvas->SizeX - AvalBarWidth) * 0.5f;
+		float AvalBarY = Canvas->SizeY - S(50.0f);
+
+		// Background bar
+		DrawRect(FLinearColor(0.0f, 0.0f, 0.0f, 0.6f), AvalBarX, AvalBarY, AvalBarWidth, AvalBarHeight);
+
+		// Fill bar: grows as avalanche gets closer (1 - GapNorm), orange → red
+		float FillNorm = 1.0f - GapNorm;
+		FLinearColor FillColor = FLinearColor::LerpUsingHSV(
+			FLinearColor(1.0f, 0.6f, 0.0f), FLinearColor(1.0f, 0.1f, 0.0f), FillNorm);
+		DrawRect(FillColor, AvalBarX, AvalBarY, AvalBarWidth * FillNorm, AvalBarHeight);
+
+		// Warning text when gap is small
+		if (GapNorm < 0.3f)
+		{
+			float Pulse = (FMath::Sin(GetWorld()->GetTimeSeconds() * 8.0f) + 1.0f) * 0.5f;
+			uint8 Alpha = FMath::RoundToInt32(180 + 75 * Pulse);
+			FColor WarningColor(255, 60, 30, Alpha);
+
+			FString WarningText = TEXT("AVALANCHE!");
+			float WarnW, WarnH;
+			GetTextSize(WarningText, WarnW, WarnH, GEngine->GetLargeFont(), UIScale);
+			DrawText(WarningText, WarningColor,
+				(Canvas->SizeX - WarnW) * 0.5f, AvalBarY - WarnH - S(8.0f),
+				GEngine->GetLargeFont(), UIScale);
+		}
+	}
 }
 
 // --- Dev Tuning Menu ---
@@ -925,6 +963,11 @@ void APowderHUD::BuildDevParamList()
 	Add(TEXT("BaseFOV"),           &Char->BaseFOV,             1.0f,    30.0f,   120.0f);
 	Add(TEXT("MaxFOV"),            &Char->MaxFOV,              1.0f,    30.0f,   120.0f);
 	Add(TEXT("FOVInterp"),         &Char->FOVInterpSpeed,      0.05f,   0.1f,    20.0f);
+
+	// -- Carve Feel params --
+	AddHeader(TEXT("-- Carve Feel --"));
+	Add(TEXT("CamCarveRollMax"),   &Char->CameraCarveRollMax,        0.5f,    0.0f,    15.0f);
+	Add(TEXT("CamCarveRollInterp"),&Char->CameraCarveRollInterpSpeed,0.5f,    1.0f,    20.0f);
 
 	// -- Surface params --
 	AddHeader(TEXT("-- Surface --"));

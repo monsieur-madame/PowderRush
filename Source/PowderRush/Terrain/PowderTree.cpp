@@ -117,12 +117,12 @@ void APowderTree::Randomize(FRandomStream& RNG, const FProceduralTreeParams& Par
 	UMaterialInstanceDynamic* FoliageMID = PowderMaterialHelper::CreateColorMID(this, FoliageCol);
 
 	// Stack foliage cones from bottom to top, each smaller than the one below
-	UStaticMeshComponent* Layers[3] = { FoliageMesh, FoliageLayer2, FoliageLayer3 };
+	UStaticMeshComponent* localLayers[3] = { FoliageMesh, FoliageLayer2, FoliageLayer3 };
 	float CurrentZ = TrunkHeight * 0.5f;  // Start at top of trunk
 
 	for (int32 i = 0; i < 3; ++i)
 	{
-		UStaticMeshComponent* Layer = Layers[i];
+		UStaticMeshComponent* Layer = localLayers[i];
 		if (!Layer)
 		{
 			continue;

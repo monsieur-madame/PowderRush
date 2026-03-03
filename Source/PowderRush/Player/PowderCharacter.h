@@ -7,10 +7,11 @@
 class UPowderMovementComponent;
 class UPowderTrickComponent;
 class UPowderTuningProfile;
-class UStaticMeshComponent;
+class USkeletalMeshComponent;
 class USpringArmComponent;
 class UCameraComponent;
 class UPowderSnowSpray;
+class UAnimSequence;
 
 UCLASS()
 class POWDERRUSH_API APowderCharacter : public APawn
@@ -102,6 +103,24 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
 	float FOVInterpSpeed = 3.0f;
 
+	/** Vertical offset for the spring arm target, raises the camera pivot above the character. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraHeightOffset = 200.0f;
+
+	/** How much the terrain slope angle influences camera pitch (0=none, 1=full slope angle added). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraSlopePitchInfluence = 0.3f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraSlopePitchInterpSpeed = 3.0f;
+
+	// --- Camera Carve Roll ---
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraCarveRollMax = 3.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Camera")
+	float CameraCarveRollInterpSpeed = 4.0f;
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tuning")
 	TObjectPtr<UPowderTuningProfile> DefaultTuningProfile;
 
@@ -116,7 +135,7 @@ public:
 
 protected:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
-	TObjectPtr<UStaticMeshComponent> MeshComp;
+	TObjectPtr<USkeletalMeshComponent> MeshComp;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
 	TObjectPtr<USpringArmComponent> SpringArmComp;
@@ -136,12 +155,18 @@ protected:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Character")
 	ERiderType RiderType = ERiderType::Snowboarder;
 
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Character")
+	TObjectPtr<UAnimSequence> DownhillAnimation;
+
 	void UpdateDioramaCamera(float DeltaTime);
 	void UpdateSnowSpray();
 	void TickCameraTuningBlend(float DeltaTime);
 
 	UFUNCTION()
 	void HandleWipeout();
+
+	float CurrentCameraCarveRoll = 0.0f;
+	float SmoothedCameraSlopePitch = 0.0f;
 
 	// Camera tuning blend state
 	bool bIsBlendingCameraTuning = false;

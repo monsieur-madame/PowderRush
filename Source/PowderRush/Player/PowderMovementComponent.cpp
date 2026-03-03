@@ -129,11 +129,9 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 			SlopeNormal = RawNormal.IsNearlyZero() ? FVector::UpVector : RawNormal;
 		}
 
-		// Derive downhill direction from gravity projected onto slope — works for any slope orientation
-		const FVector Gravity = FVector(0.0f, 0.0f, -1.0f);
-		const FVector SlopeDownhill = FVector::VectorPlaneProject(Gravity, SlopeNormal).GetSafeNormal();
-		FVector TargetDownhill = SlopeDownhill;
-
+		// Derive downhill direction: course spline tangent is authoritative when available,
+		// gravity projection is fallback only (degenerate on flat terrain).
+		bool bHasCourseDirection = false;
 		if (IPowderSurfaceQueryProvider* SurfaceProvider = ResolveSurfaceQueryProvider(DeltaTime))
 		{
 			FVector CourseTangent = FVector::ForwardVector;
@@ -147,51 +145,97 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 				CourseDistance,
 				CrossTrackDistance))
 			{
-				FVector CourseDownhill = FVector::VectorPlaneProject(CourseTangent.GetSafeNormal(), SlopeNormal).GetSafeNormal();
-				if (CourseDownhill.IsNearlyZero())
+				FVector CourseOnSlope = FVector::VectorPlaneProject(CourseTangent.GetSafeNormal(), SlopeNormal).GetSafeNormal();
+				if (CourseOnSlope.IsNearlyZero())
 				{
-					CourseDownhill = CourseTangent.GetSafeNormal();
+					CourseOnSlope = CourseTangent.GetSafeNormal();
 				}
-
-				if (!CourseDownhill.IsNearlyZero())
+				if (!CourseOnSlope.IsNearlyZero())
 				{
-					if (!SlopeDownhill.IsNearlyZero())
-					{
-						TargetDownhill = FMath::Lerp(
-							SlopeDownhill,
-							CourseDownhill,
-							FMath::Clamp(CourseHeadingBlend, 0.0f, 1.0f)).GetSafeNormal();
-					}
-					else
-					{
-						TargetDownhill = CourseDownhill;
-					}
+					// Direct assignment — no blend, no interp lag
+					SlopeForward = CourseOnSlope;
+					bHasCourseDirection = true;
 				}
 			}
 		}
 
-		if (!TargetDownhill.IsNearlyZero())
+		// Fallback: gravity-downhill when no course is available
+		if (!bHasCourseDirection)
 		{
-			SlopeForward = FMath::VInterpTo(
-				SlopeForward,
-				TargetDownhill,
-				DeltaTime,
-				FMath::Max(0.0f, SlopeForwardInterpSpeed)).GetSafeNormal();
+			const FVector Gravity = FVector(0.0f, 0.0f, -1.0f);
+			const FVector SlopeDownhill = FVector::VectorPlaneProject(Gravity, SlopeNormal).GetSafeNormal();
+			if (!SlopeDownhill.IsNearlyZero())
+			{
+				if (!bHeadingInitialized)
+				{
+					SlopeForward = SlopeDownhill;
+				}
+				else
+				{
+					SlopeForward = FMath::VInterpTo(
+						SlopeForward,
+						SlopeDownhill,
+						DeltaTime,
+						FMath::Max(0.0f, SlopeForwardInterpSpeed)).GetSafeNormal();
+				}
+			}
 		}
 
-		// Snap to terrain surface — deadzone prevents micro-jitter on mesh seams
+		// Gravity-based terrain following: only snap UP, let gravity handle downward
 		float DesiredHeight = Hit.ImpactPoint.Z + CapsuleHalfHeight + TerrainContactOffset;
 		float HeightDelta = DesiredHeight - CurrentLocation.Z;
-		if (FMath::Abs(HeightDelta) > TerrainSnapThreshold)
+
+		if (HeightDelta > TerrainSnapThreshold)
 		{
+			// Terrain is above us (going uphill / riding up ramp) — snap up to stay on surface
 			FVector HeightAdjust = FVector(0.0f, 0.0f, HeightDelta);
 			UpdatedComponent->MoveComponent(HeightAdjust, UpdatedComponent->GetComponentRotation(), true);
+			GroundVerticalVelocity = 0.0f;
+		}
+		else if (HeightDelta >= -TerrainSnapThreshold)
+		{
+			// Within snap threshold — solidly on ground
+			GroundVerticalVelocity = 0.0f;
+		}
+		else
+		{
+			// Terrain is below us (drop, bump, ramp lip) — let gravity pull us down naturally
+			// Inherit upward velocity from slope movement on first frame of separation
+			if (GroundVerticalVelocity >= 0.0f && Velocity.Z > 0.0f)
+			{
+				GroundVerticalVelocity = Velocity.Z;
+			}
+			GroundVerticalVelocity -= GravityAcceleration * DeltaTime;
+
+			float VerticalMove = GroundVerticalVelocity * DeltaTime;
+
+			// Don't go below the terrain surface
+			if (VerticalMove < HeightDelta)
+			{
+				VerticalMove = HeightDelta;
+				GroundVerticalVelocity = 0.0f; // Settled back on terrain
+			}
+
+			UpdatedComponent->MoveComponent(
+				FVector(0.0f, 0.0f, VerticalMove),
+				UpdatedComponent->GetComponentRotation(), true);
+
+			// If separated enough, transition to full airborne physics
+			float Separation = (CurrentLocation.Z + VerticalMove) - DesiredHeight;
+			if (Separation > LedgeLaunchThreshold)
+			{
+				LaunchIntoAir(FVector(0.0f, 0.0f, GroundVerticalVelocity));
+				GroundVerticalVelocity = 0.0f;
+				return;
+			}
 		}
 
 		// Initialize heading from slope on first ground contact
-		if (DesiredYaw == 0.0f && !SlopeForward.IsNearlyZero())
+		if (!bHeadingInitialized && !SlopeForward.IsNearlyZero())
 		{
 			DesiredYaw = SlopeForward.Rotation().Yaw;
+			VisualYaw = DesiredYaw;
+			bHeadingInitialized = true;
 		}
 
 		if (IPowderSurfaceQueryProvider* SurfaceProvider = ResolveSurfaceQueryProvider(DeltaTime))
@@ -206,9 +250,20 @@ void UPowderMovementComponent::UpdateTerrainFollowing(float DeltaTime)
 	}
 	else
 	{
-		// No valid terrain hit — apply gravity so the character settles onto terrain
+		// No valid terrain hit — go airborne with current velocity
 		bOnGround = false;
 		GroundNormalStability = FMath::FInterpTo(GroundNormalStability, 0.0f, DeltaTime, 4.0f);
+
+		if (CurrentSpeed > 50.0f)
+		{
+			// Moving with speed — transition to full airborne physics
+			float LaunchZ = FMath::Max(GroundVerticalVelocity, Velocity.Z);
+			LaunchIntoAir(FVector(0.0f, 0.0f, FMath::Max(0.0f, LaunchZ)));
+			GroundVerticalVelocity = 0.0f;
+			return;
+		}
+
+		// Stationary / very slow — just apply gravity to settle
 		FVector GravityDrop = FVector(0.0f, 0.0f, -GravityAcceleration * DeltaTime);
 		UpdatedComponent->MoveComponent(GravityDrop, UpdatedComponent->GetComponentRotation(), true);
 	}
@@ -465,12 +520,13 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 	MoveDirection = FVector::VectorPlaneProject(MoveDirection, SlopeNormal).GetSafeNormal();
 	FVector TotalMovement = MoveDirection * EffectiveSpeed * DeltaTime;
 
-	// Lateral drift/slide during carves
-	if (CarveLateralSpeed > 0.0f && FMath::Abs(CurrentCarveAngle) > 1.0f)
+	// Lateral drift/slide during carves — scales with forward speed (no drift when stationary)
+	if (CarveLateralSpeed > 0.0f && FMath::Abs(CurrentCarveAngle) > 1.0f && EffectiveSpeed > 1.0f)
 	{
 		FVector RightVector = FVector::CrossProduct(SlopeNormal, MoveDirection).GetSafeNormal();
 		float CarveNorm = CurrentCarveAngle / MaxCarveAngle;
-		TotalMovement += RightVector * CarveNorm * CarveLateralSpeed * DeltaTime;
+		float LateralFactor = FMath::Clamp(EffectiveSpeed / FMath::Max(1.0f, MaxSpeed), 0.0f, 1.0f);
+		TotalMovement += RightVector * CarveNorm * CarveLateralSpeed * LateralFactor * DeltaTime;
 	}
 
 	Velocity = TotalMovement / DeltaTime;
@@ -485,11 +541,33 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 		VisualYaw = DesiredYaw;
 	}
 
-	// Rotate capsule to face heading — Yaw only
-	FRotator DesiredRotation = UpdatedComponent->GetComponentRotation();
-	DesiredRotation.Pitch = 0.0f;
-	DesiredRotation.Roll = 0.0f;
-	DesiredRotation.Yaw = VisualYaw;
+	// --- Compute lean and pitch in movement space, then compose with mesh offset ---
+
+	// Slope cross-tilt: lean into the hill when traversing across a slope
+	FVector CharForward = FRotator(0.0f, DesiredYaw, 0.0f).Vector();
+	FVector CharRight = FVector::CrossProduct(FVector::UpVector, CharForward).GetSafeNormal();
+	float SlopeLateralComponent = FVector::DotProduct(SlopeNormal, CharRight);
+	float SlopeRoll = -FMath::RadiansToDegrees(FMath::Asin(FMath::Clamp(SlopeLateralComponent, -1.0f, 1.0f)));
+
+	// Carve lean: additional roll into the turn, scaled by edge depth and speed
+	float CarveNorm = CurrentCarveAngle / FMath::Max(1.0f, MaxCarveAngle);
+	float SpeedLeanScale = FMath::Clamp(CurrentSpeed / FMath::Max(1.0f, MaxSpeed), 0.2f, 1.0f);
+	float CarveLean = -CarveNorm * CarveLeanMaxAngle * SpeedLeanScale;
+
+	float TargetLean = SlopeRoll + CarveLean;
+	SmoothedCarveLean = FMath::FInterpTo(SmoothedCarveLean, TargetLean, DeltaTime, CarveLeanInterpSpeed);
+
+	// Slope-aligned pitch: project movement direction onto slope plane
+	FVector MoveOnSlope = FVector::VectorPlaneProject(CharForward, SlopeNormal).GetSafeNormal();
+	float SlopePitch = FMath::RadiansToDegrees(FMath::Asin(MoveOnSlope.Z));
+	SmoothedSlopePitch = FMath::FInterpTo(SmoothedSlopePitch, SlopePitch, DeltaTime, SlopePitchInterpSpeed);
+
+	// Compose rotation: heading tilt (pitch/roll in movement frame) then mesh offset
+	// This ensures lean/pitch axes are correct regardless of VisualYawOffset
+	FQuat HeadingQuat = FRotator(0.0f, VisualYaw, 0.0f).Quaternion();
+	FQuat TiltQuat = FRotator(SmoothedSlopePitch, 0.0f, SmoothedCarveLean).Quaternion();
+	FQuat MeshOffsetQuat = FRotator(0.0f, VisualYawOffset, 0.0f).Quaternion();
+	FRotator DesiredRotation = (HeadingQuat * TiltQuat * MeshOffsetQuat).Rotator();
 
 	FHitResult Hit;
 	UpdatedComponent->MoveComponent(TotalMovement, DesiredRotation, true, &Hit);
@@ -546,6 +624,7 @@ void UPowderMovementComponent::ResetMovementState()
 	bIsBoosting = false;
 	BoostTimer = 0.0f;
 	DesiredYaw = 0.0f;
+	bHeadingInitialized = false;
 	SmoothedCarveBleed = 0.0f;
 	SmoothedCarveInput = 0.0f;
 	VisualYaw = 0.0f;
@@ -563,7 +642,46 @@ void UPowderMovementComponent::ResetMovementState()
 	bInEdgeTransition = false;
 	LastCarveSign = 0;
 	CarvePressure = 0.0f;
+	SmoothedCarveLean = 0.0f;
+	SmoothedSlopePitch = 0.0f;
+	GroundVerticalVelocity = 0.0f;
 	Velocity = FVector::ZeroVector;
+	SlopeForward = FVector::ForwardVector;
+	SlopeNormal = FVector::UpVector;
+}
+
+void UPowderMovementComponent::InitializeHeading(const FVector& CourseDirection)
+{
+	FVector Dir = FVector(CourseDirection.X, CourseDirection.Y, 0.0f).GetSafeNormal();
+	if (Dir.IsNearlyZero())
+	{
+		return;
+	}
+	SlopeForward = Dir;
+	DesiredYaw = Dir.Rotation().Yaw;
+	VisualYaw = DesiredYaw;
+	bHeadingInitialized = true;
+
+	if (!UpdatedComponent)
+	{
+		return;
+	}
+
+	// Apply rotation immediately so the mesh faces correctly even while frozen
+	FRotator Rot = UpdatedComponent->GetComponentRotation();
+	Rot.Yaw = VisualYaw + VisualYawOffset;
+	UpdatedComponent->SetWorldRotation(Rot);
+
+	// Snap to terrain so the character doesn't float while frozen at spawn
+	FVector Loc = UpdatedComponent->GetComponentLocation();
+	FVector TraceStart = Loc + FVector(0.0f, 0.0f, 400.0f);
+	FVector TraceEnd = TraceStart - FVector(0.0f, 0.0f, 400.0f + TerrainTraceDistance);
+	FHitResult Hit;
+	if (TraceForTaggedTerrain(TraceStart, TraceEnd, Hit) && Hit.ImpactNormal.Z > MinGroundNormalZ)
+	{
+		float DesiredZ = Hit.ImpactPoint.Z + GetOwnerCapsuleHalfHeight() + TerrainContactOffset;
+		UpdatedComponent->SetWorldLocation(FVector(Loc.X, Loc.Y, DesiredZ));
+	}
 }
 
 void UPowderMovementComponent::SetFrozen(bool bFreeze)
@@ -603,6 +721,15 @@ void UPowderMovementComponent::LaunchIntoAir(FVector AdditionalVelocity)
 	OnLaunched.Broadcast();
 }
 
+void UPowderMovementComponent::AddAirborneImpulse(FVector Impulse)
+{
+	if (!bIsAirborne)
+	{
+		return;
+	}
+	AirborneVelocity += Impulse;
+}
+
 void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 {
 	if (!UpdatedComponent)
@@ -628,11 +755,13 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 	UpdatedComponent->MoveComponent(Movement, CurrentRotation, true, &Hit);
 
 	bool bLanded = false;
+	FVector LandingSurfaceNormal = SlopeNormal; // Will be updated with actual landing surface
 
 	// Check for landing: blocking hit with upward-facing surface (obstacle or non-slope geometry)
 	if (Hit.IsValidBlockingHit() && Hit.ImpactNormal.Z > MinGroundNormalZ)
 	{
 		bLanded = true;
+		LandingSurfaceNormal = Hit.ImpactNormal;
 	}
 
 	// Trace-based landing fallback: slopes ignore Pawn sweeps to prevent seam collision,
@@ -655,6 +784,7 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 				FVector SnapDelta(0.0f, 0.0f, GroundZ - CurrentPos.Z);
 				UpdatedComponent->MoveComponent(SnapDelta, CurrentRotation, true);
 				bLanded = true;
+				LandingSurfaceNormal = TraceHit.ImpactNormal;
 			}
 		}
 	}
@@ -663,17 +793,34 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 	{
 		bIsAirborne = false;
 
+		// Update SlopeNormal to actual landing surface so terrain following resumes correctly
+		SlopeNormal = LandingSurfaceNormal;
+
+		// Reset visual lean/pitch so the first ground tick doesn't snap to stale pre-flight values
+		SmoothedCarveLean = 0.0f;
+		SmoothedSlopePitch = 0.0f;
+
 		// Start landing blend
 		bIsLandingBlend = true;
 		LandingBlendTimer = LandingBlendDuration;
 
-		// --- Landing quality assessment (Feature 5) ---
-		// Perfect landing: velocity parallel to slope (dot with normal ~ 0)
-		// Bad landing: velocity into ground (dot with normal ~ -1)
-		FVector VelocityDir = AirborneVelocity.GetSafeNormal();
-		float LandingDot = FVector::DotProduct(VelocityDir, SlopeNormal);
-		// Map: dot 0 (parallel) → quality 1.0, dot -1 (into ground) → quality 0.0
-		float LandingQuality = FMath::Clamp(1.0f + LandingDot, 0.0f, 1.0f);
+		// --- Physics-based landing (velocity projection onto slope) ---
+		// Decompose airborne velocity into slope-parallel and slope-perpendicular components.
+		// Parallel component = post-landing speed (vertical velocity converts to forward speed on slopes).
+		// Perpendicular component = impact force (determines penalty).
+		float NormalComponent = FVector::DotProduct(AirborneVelocity, LandingSurfaceNormal);
+		FVector ImpactVelocity = NormalComponent * LandingSurfaceNormal;
+		FVector SlopeParallelVelocity = AirborneVelocity - ImpactVelocity;
+
+		float SlopeParallelSpeed = SlopeParallelVelocity.Size();
+		float ImpactSpeed = FMath::Abs(NormalComponent);
+
+		// Landing quality based on how much velocity is impact vs glide.
+		// Low impact relative to total speed = smooth landing.
+		float TotalSpeed = AirborneVelocity.Size();
+		float ImpactRatio = (TotalSpeed > 1.0f) ? (ImpactSpeed / TotalSpeed) : 0.0f;
+		// Map: ratio 0 (pure glide) → quality 1.0, ratio 1 (straight into ground) → quality 0.0
+		float LandingQuality = FMath::Clamp(1.0f - ImpactRatio, 0.0f, 1.0f);
 
 		// Apply threshold: above threshold = perfect (no penalty)
 		if (LandingQuality >= LandingQualityThreshold)
@@ -688,11 +835,17 @@ void UPowderMovementComponent::UpdateAirborne(float DeltaTime)
 				LandingQuality);
 		}
 
-		// Restore speed from horizontal component with landing penalty
-		FVector HorizontalVel(AirborneVelocity.X, AirborneVelocity.Y, 0.0f);
-		float HorizontalSpeed = HorizontalVel.Size();
+		// Post-landing speed from slope-parallel projection with impact absorption penalty
 		float SpeedPenalty = (1.0f - LandingQuality) * LandingSpeedPenaltyMax;
-		CurrentSpeed = FMath::Clamp(HorizontalSpeed * (1.0f - SpeedPenalty), 0.0f, MaxSpeed);
+		CurrentSpeed = FMath::Clamp(SlopeParallelSpeed * (1.0f - SpeedPenalty), 0.0f, MaxSpeed);
+
+		// Align heading to slope-parallel velocity direction
+		FVector SlopeParallelHorizontal(SlopeParallelVelocity.X, SlopeParallelVelocity.Y, 0.0f);
+		if (SlopeParallelHorizontal.SizeSquared() > 100.0f)
+		{
+			DesiredYaw = SlopeParallelHorizontal.Rotation().Yaw;
+			VisualYaw = DesiredYaw;
+		}
 
 		// Set landing control penalty for bad landings
 		if (LandingQuality < 1.0f)
@@ -786,11 +939,13 @@ IPowderSurfaceQueryProvider* UPowderMovementComponent::ResolveSurfaceQueryProvid
 
 float UPowderMovementComponent::GetOwnerCapsuleHalfHeight() const
 {
-	// Derive half-height from the UpdatedComponent's collision bounds (works with any collision shape)
+	// Derive the distance from the component pivot to the bottom of its bounding box.
+	// Center pivot: Origin.Z=0, Extent.Z=half → returns half (correct).
+	// Bottom pivot: Origin.Z=half, Extent.Z=half → returns 0 (correct).
 	if (UpdatedComponent)
 	{
 		FBoxSphereBounds Bounds = UpdatedComponent->CalcBounds(FTransform::Identity);
-		return Bounds.BoxExtent.Z;
+		return Bounds.BoxExtent.Z - Bounds.Origin.Z;
 	}
 
 	return 90.0f;
@@ -968,3 +1123,4 @@ void UPowderMovementComponent::TickSurfaceBlend(float DeltaTime)
 		bIsBlendingSurface = false;
 	}
 }
+

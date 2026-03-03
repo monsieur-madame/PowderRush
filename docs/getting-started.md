@@ -248,6 +248,15 @@ These appear as clickable buttons in the Details panel when an `APowderCoursePat
 
 Both auto-tag themselves with `PowderObstacle` and have proper collision set up.
 
+**APowderJump** — Ski jump ramp. Place on the slope and the player rides up it naturally, going airborne off the lip. The ramp mesh auto-tags itself with `PowderTerrain` so terrain following works. A thin trigger at the lip transitions the player to airborne state with their natural velocity (no forced impulse — the arc comes from the ramp geometry). Players can ollie on the ramp for extra pop.
+
+| Property | Default | Description |
+|---|---|---|
+| `RampLength` | `400` | Front-to-back ramp size (cm) |
+| `RampWidth` | `300` | Left-to-right ramp size (cm) |
+| `RampHeight` | `150` | Vertical rise — pitch angle auto-calculated from height/length |
+| `LaunchSpeedMultiplier` | `0.6` | (Legacy, not used with natural launch) |
+
 ### Placement Tips
 
 - Place obstacles along the course where you want challenge areas.
@@ -271,10 +280,16 @@ All movement parameters live on `UPowderMovementComponent` under the `"PowderRus
 ### Carving
 | Parameter | Default | What It Controls |
 |---|---|---|
-| `MaxCarveAngle` | `90` | Maximum carve turn angle |
+| `MaxCarveAngle` | `50` | Maximum carve turn angle |
 | `YawRate` | `90` | Turn speed at full carve (deg/s) |
-| `CarveLateralSpeed` | `1400` | Sideways drift during carves |
-| `CarveSpeedBleed` | `0.5` | Speed penalty from carving |
+| `CarveLateralSpeed` | `700` | Sideways drift during carves |
+| `CarveSpeedBleed` | `0.70` | Speed penalty from carving |
+| `TurnRateLimitDegPerSec` | `130` | Max heading change rate |
+| `DownhillAlignRate` | `28` | How fast heading returns to fall line after carve release |
+| `EdgeDisengageRate` | `1.8` | Edge release speed (lower = more lateral carry) |
+| `HeadingTraverseFactor` | `0.15` | Gravity at 90° traverse (0=no accel, 1=full) |
+| `CarveLeanMaxAngle` | `25` | Max visual body lean into turns (degrees) |
+| `SlopePitchInterpSpeed` | `8` | How fast slope pitch adjusts |
 | `CarveRampTime` | `0.6` | Ease-in duration for carve input |
 | `CourseHeadingBlend` | `0.85` | 0 = pure gravity downhill, 1 = pure course spline heading |
 
@@ -292,6 +307,9 @@ All movement parameters live on `UPowderMovementComponent` under the `"PowderRus
 | `TerrainTraceDistance` | `1000` | How far down to trace for ground |
 | `TerrainContactOffset` | `-6` | Z adjustment after snap |
 | `GroundNormalFilterSpeed` | `12` | How fast the terrain normal smooths |
+| `LedgeLaunchThreshold` | `50` | Height separation (cm) that triggers airborne transition |
+
+**Gravity-based following**: Terrain only snaps the player UP (going uphill / riding ramps). When terrain drops away (bumps, ledges, ramp lips), gravity pulls the player down naturally, preserving any upward slope velocity. If the player separates from terrain by more than `LedgeLaunchThreshold`, they transition to full airborne physics. This makes all terrain transitions feel natural without special-case code.
 
 ### Data-Driven Tuning
 
@@ -349,3 +367,7 @@ InMenu ──[Start]──► Starting ──► Running ──[Finish]──►
 | Boundary trees not generating | `BoundaryTreeMeshes` array is empty on the CoursePath actor |
 | Game stuck in InMenu | No "Start" button tap / TerrainManager or EnvironmentSetup missing from level |
 | Movement feels wrong | Check `CourseHeadingBlend` — values near 1.0 follow the spline closely, near 0.0 follow raw gravity |
+| Player goes through jump ramp | Ramp mesh missing `PowderTerrain` component tag (auto-applied in code, but check if overridden) |
+| Jump launches player into ground | Ramp not tagged with `PowderTerrain` — terrain trace ignores ramp and snaps player to ground below |
+| Camera clips into terrain | Increase `CameraHeightOffset` on the character, or check that `bDoCollisionTest` is enabled on the spring arm |
+| Character lean looks wrong | Rotation must use quaternion composition (Heading * Tilt * MeshOffset) when VisualYawOffset != 0 |
