@@ -1,9 +1,12 @@
 #include "Terrain/PowderCoursePath.h"
 
+#include "Components/BoxComponent.h"
 #include "Components/SceneComponent.h"
 #include "Components/SplineComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
+#include "Effects/PowderWeatherManager.h"
+#include "Effects/PowderWeatherVolume.h"
 #include "Terrain/PowderFinishLine.h"
 #include "Engine/World.h"
 #include "EngineUtils.h"
@@ -16,6 +19,7 @@ namespace
 const FName PowderObstacleTag(TEXT("PowderObstacle"));
 const FName PowderGeneratedTag(TEXT("PowderGenerated"));
 const FName PowderBoundaryTag(TEXT("PowderBoundaryTree"));
+const FName PowderWeatherZoneTag(TEXT("PowderWeatherZone"));
 
 bool FindPowderTerrainHit(
 	UWorld* World,
@@ -79,6 +83,8 @@ APowderCoursePath::APowderCoursePath()
 	CourseSpline->SetDrawDebug(false);
 
 	FinishLineClass = APowderFinishLine::StaticClass();
+
+	WeatherZonePresets = { EWeatherPreset::ClearDay, EWeatherPreset::Overcast, EWeatherPreset::Snowfall };
 }
 
 void APowderCoursePath::SnapPointsToPowderTerrain()
@@ -460,6 +466,111 @@ void APowderCoursePath::GenerateBoundaryTrees()
 		BoundaryTreeHISMComponents.Num());
 
 	MarkPackageDirty();
+#endif
+}
+
+void APowderCoursePath::GenerateWeatherZones()
+{
+#if WITH_EDITOR
+	if (!CourseSpline)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	if (CourseSpline->GetNumberOfSplinePoints() < 2)
+	{
+		return;
+	}
+
+	const int32 ZoneCount = FMath::Max(1, WeatherZoneCount);
+	if (WeatherZonePresets.Num() == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("PowderCoursePath: GenerateWeatherZones aborted. No WeatherZonePresets assigned."));
+		return;
+	}
+
+	// Optionally remove previously generated weather volumes
+	if (bReplaceExistingWeatherZones)
+	{
+		TArray<AActor*> ToDestroy;
+		for (TActorIterator<APowderWeatherVolume> It(World); It; ++It)
+		{
+			if ((*It)->Tags.Contains(PowderWeatherZoneTag))
+			{
+				ToDestroy.Add(*It);
+			}
+		}
+		for (AActor* Actor : ToDestroy)
+		{
+			Actor->Destroy();
+		}
+	}
+
+	const float SplineLength = CourseSpline->GetSplineLength();
+	if (SplineLength <= KINDA_SMALL_NUMBER)
+	{
+		return;
+	}
+
+	const float SegmentLength = SplineLength / static_cast<float>(ZoneCount);
+	int32 PlacedCount = 0;
+
+	for (int32 Idx = 0; Idx < ZoneCount; ++Idx)
+	{
+		const float StartDist = static_cast<float>(Idx) * SegmentLength;
+		const float EndDist = FMath::Min(StartDist + SegmentLength, SplineLength);
+		const float MidDist = (StartDist + EndDist) * 0.5f;
+
+		const FVector StartPos = CourseSpline->GetLocationAtDistanceAlongSpline(StartDist, ESplineCoordinateSpace::World);
+		const FVector EndPos = CourseSpline->GetLocationAtDistanceAlongSpline(EndDist, ESplineCoordinateSpace::World);
+		const FVector MidPos = CourseSpline->GetLocationAtDistanceAlongSpline(MidDist, ESplineCoordinateSpace::World);
+
+		// Volume center at the midpoint of this segment
+		const FVector Center = MidPos;
+
+		// Compute extent: half the segment length along X, lateral width along Y, generous height
+		const float HalfLength = FVector::Dist(StartPos, EndPos) * 0.5f;
+		const float HalfWidth = FMath::Max(500.0f, WeatherZoneLateralWidth);
+		const float HalfHeight = 1200.0f;
+
+		// Orient the volume along the spline tangent at the midpoint
+		const FVector Tangent = CourseSpline->GetDirectionAtDistanceAlongSpline(MidDist, ESplineCoordinateSpace::World).GetSafeNormal();
+		const FRotator VolumeRotation = Tangent.IsNearlyZero() ? FRotator::ZeroRotator : Tangent.Rotation();
+
+		FActorSpawnParameters Params;
+		Params.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+		APowderWeatherVolume* Volume = World->SpawnActor<APowderWeatherVolume>(
+			APowderWeatherVolume::StaticClass(), Center, VolumeRotation, Params);
+		if (!Volume)
+		{
+			continue;
+		}
+
+		Volume->Tags.AddUnique(PowderGeneratedTag);
+		Volume->Tags.AddUnique(PowderWeatherZoneTag);
+		Volume->SetActorLabel(FString::Printf(TEXT("WeatherZone_%d"), Idx));
+
+		// Size the box to cover this segment
+		if (Volume->VolumeBounds)
+		{
+			Volume->VolumeBounds->SetBoxExtent(FVector(HalfLength, HalfWidth, HalfHeight));
+		}
+
+		// Assign weather preset (wraps around if fewer presets than zones)
+		const EWeatherPreset Preset = WeatherZonePresets[Idx % WeatherZonePresets.Num()];
+		Volume->Config = UPowderWeatherManager::GetDefaultConfig(Preset);
+		Volume->Priority = Idx;
+
+		++PlacedCount;
+	}
+
+	UE_LOG(LogTemp, Log, TEXT("PowderCoursePath: Generated %d weather zones along spline."), PlacedCount);
 #endif
 }
 

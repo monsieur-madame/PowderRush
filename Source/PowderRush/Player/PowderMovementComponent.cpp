@@ -584,10 +584,10 @@ void UPowderMovementComponent::ApplyMovement(float DeltaTime)
 
 		if (bIsObstacle)
 		{
-			// Obstacle hit = full stop and wipeout
+			// Obstacle hit = full stop, speed penalty only (no run restart)
 			CurrentSpeed = 0.0f;
 			WipeoutRecoveryTimer = 0.3f;
-			OnWipeout.Broadcast();
+			OnObstacleHit.Broadcast();
 
 			// Push outward to prevent stuck inside geometry
 			FVector PushOut = Hit.ImpactNormal * 50.0f;

@@ -6,6 +6,9 @@
 #include "PowderWeatherVolume.generated.h"
 
 class UBoxComponent;
+class UNiagaraComponent;
+class UNiagaraSystem;
+class APowderEnvironmentSetup;
 
 UCLASS()
 class POWDERRUSH_API APowderWeatherVolume : public AActor
@@ -14,6 +17,9 @@ class POWDERRUSH_API APowderWeatherVolume : public AActor
 
 public:
 	APowderWeatherVolume();
+
+	virtual void BeginPlay() override;
+	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 	/** Computes weather at world position by blending active volumes of highest priority. */
 	static bool GetWeatherAtLocation(UWorld* World, const FVector& WorldLocation, FWeatherConfig& OutConfig);
@@ -37,7 +43,19 @@ public:
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Weather|Volume")
 	TObjectPtr<UBoxComponent> VolumeBounds;
 
+	/** Apply this volume's weather config to the scene (editor preview). */
+	UFUNCTION(CallInEditor, Category = "PowderRush|Weather|Volume")
+	void PreviewWeather();
+
 private:
 	float ComputeInfluenceWeight(const FVector& WorldLocation) const;
+
+	void CreateSnowfallComponent();
+	void UpdateSnowfallActivation();
+
+	UPROPERTY()
+	TObjectPtr<UNiagaraComponent> SnowfallComponent;
+
+	FTimerHandle ActivationTimerHandle;
 };
 

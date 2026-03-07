@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Core/PowderTypes.h"
 #include "GameFramework/Actor.h"
 #include "PowderCoursePath.generated.h"
 
@@ -10,6 +11,7 @@ class UStaticMesh;
 class UMaterialInterface;
 class UHierarchicalInstancedStaticMeshComponent;
 class APowderFinishLine;
+class APowderWeatherVolume;
 
 UCLASS()
 class POWDERRUSH_API APowderCoursePath : public AActor
@@ -36,6 +38,9 @@ public:
 
 	UFUNCTION(CallInEditor, Category = "PowderRush|Terrain|Course|Tools")
 	void ClearBoundaryTrees();
+
+	UFUNCTION(CallInEditor, Category = "PowderRush|Terrain|Course|Tools")
+	void GenerateWeatherZones();
 
 	/** Author-facing identifier for this course path. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course")
@@ -135,6 +140,24 @@ public:
 	/** If true, previous generated boundary trees are removed before generating. */
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course|Boundary")
 	bool bReplaceExistingBoundaryTrees = true;
+
+	// --- Weather Zone Generation ---
+
+	/** Number of weather zones to generate along the course. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course|WeatherZones", meta = (ClampMin = "1", ClampMax = "20"))
+	int32 WeatherZoneCount = 3;
+
+	/** Lateral half-width of generated weather volumes (cm). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course|WeatherZones", meta = (ClampMin = "500.0"))
+	float WeatherZoneLateralWidth = 5000.0f;
+
+	/** Weather presets assigned in sequence to generated zones. Wraps if fewer presets than zones. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course|WeatherZones")
+	TArray<EWeatherPreset> WeatherZonePresets;
+
+	/** If true, delete existing generated weather volumes before generating new ones. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Terrain|Course|WeatherZones")
+	bool bReplaceExistingWeatherZones = true;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "PowderRush|Terrain")
 	TObjectPtr<USceneComponent> Root;

@@ -8,6 +8,7 @@
 #include "PowderAvalancheComponent.generated.h"
 
 class ATerrainManager;
+class APowderAvalancheActor;
 
 UCLASS(ClassGroup=(PowderRush), meta=(BlueprintSpawnableComponent))
 class POWDERRUSH_API UPowderAvalancheComponent : public UActorComponent
@@ -67,6 +68,10 @@ protected:
 	UFUNCTION()
 	void OnRunStateChanged(EPowderRunState NewState);
 
+	void SpawnVisual();
+	void DestroyVisual();
+	void UpdateVisualPosition();
+
 private:
 	float AvalancheDistance = 0.0f;
 	float ElapsedRunTime = 0.0f;
@@ -74,4 +79,7 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<ATerrainManager> CachedTerrainManager;
+
+	UPROPERTY()
+	TObjectPtr<APowderAvalancheActor> AvalancheVisual;
 };

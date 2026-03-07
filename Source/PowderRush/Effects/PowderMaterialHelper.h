@@ -18,6 +18,12 @@ namespace PowderMaterialHelper
 	/** Creates a MID from the snow terrain material with the given color and roughness. */
 	UMaterialInstanceDynamic* CreateSnowTerrainMID(UObject* Outer, FLinearColor SnowColor, float Roughness = 0.85f);
 
+	/** Returns a shared translucent unlit UMaterial with a "Color" vector parameter and "Opacity" scalar. */
+	UMaterial* GetTranslucentColorMaterial();
+
+	/** Creates a MID from the translucent material with the given color and opacity. */
+	UMaterialInstanceDynamic* CreateTranslucentColorMID(UObject* Outer, FLinearColor Color, float Opacity = 0.5f);
+
 	/** Returns a shared two-sided unlit UMaterial for the sky dome. */
 	UMaterial* GetSkyDomeMaterial();
 

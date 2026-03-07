@@ -115,6 +115,10 @@ public:
 	UPROPERTY(BlueprintAssignable, Category = "PowderRush|Movement")
 	FOnWipeout OnWipeout;
 
+	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnObstacleHit);
+	UPROPERTY(BlueprintAssignable, Category = "PowderRush|Movement")
+	FOnObstacleHit OnObstacleHit;
+
 	DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnLaunched);
 	UPROPERTY(BlueprintAssignable, Category = "PowderRush|Movement")
 	FOnLaunched OnLaunched;

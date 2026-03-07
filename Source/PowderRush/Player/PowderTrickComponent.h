@@ -47,6 +47,16 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tricks")
 	TArray<FPowderTrickDefinition> TrickDefinitions;
 
+	/** Height of the rotation pivot above the mesh origin (center-of-mass approximation, cm).
+	 *  Auto-derived from pelvis bone at BeginPlay when a skeletal mesh is present.
+	 *  Fallback default used if no skeleton or pelvis bone found. */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tricks")
+	float TrickPivotHeight = 90.0f;
+
+	/** Name of the bone to use for deriving pivot height (typically pelvis/hips). */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "PowderRush|Tricks")
+	FName PivotBoneName = FName(TEXT("pelvis"));
+
 	// Called by movement component delegates
 	UFUNCTION()
 	void OnBecameAirborne();
@@ -82,4 +92,8 @@ protected:
 	void FailTrick();
 	void ResetJumpState();
 	void RestoreBaseRotation();
+	void UndoPivotOffset();
+
+	// Pivot offset tracking — applied/undone each frame during tricks
+	FVector TrickVisualOffset = FVector::ZeroVector;
 };

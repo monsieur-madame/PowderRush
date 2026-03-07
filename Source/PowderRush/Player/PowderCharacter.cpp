@@ -280,7 +280,7 @@ void APowderCharacter::UpdateSnowSpray()
 	{
 		float CarveAngle = MovementComp->GetCarveAngle();
 		const FSurfaceProperties& Surface = MovementComp->CurrentSurface;
-		SnowSprayComp->ActivateSpray(CarveAngle, Surface.SnowSprayAmount, Surface.SprayColor);
+		SnowSprayComp->ActivateSpray(CarveAngle, MovementComp->GetSpeedNormalized(), Surface.SnowSprayAmount, Surface.SprayColor);
 	}
 	else if (!bShouldSpray && SnowSprayComp->IsSprayActive())
 	{

@@ -4,8 +4,6 @@
 #include "Components/SkyLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Materials/MaterialInstanceDynamic.h"
-#include "NiagaraComponent.h"
-#include "NiagaraFunctionLibrary.h"
 
 UPowderWeatherManager::UPowderWeatherManager()
 {
@@ -117,14 +115,6 @@ void UPowderWeatherManager::ApplyWeatherState(const FWeatherConfig& Config)
 		CachedFog->FogHeightFalloff = Config.FogHeightFalloff;
 		CachedFog->SetStartDistance(Config.FogStartDistance);
 	}
-
-	// Snowfall Niagara — set spawn rate if component exists
-	if (SnowfallComponent)
-	{
-		SnowfallComponent->SetVariableFloat(FName("SpawnRate"), Config.SnowfallRate * 200.0f);
-		SnowfallComponent->SetVariableFloat(FName("WindStrength"), Config.WindStrength);
-		SnowfallComponent->SetVariableFloat(FName("WindDirection"), Config.WindDirection);
-	}
 }
 
 FWeatherConfig UPowderWeatherManager::GetDefaultConfig(EWeatherPreset Preset)
@@ -221,3 +211,4 @@ FWeatherConfig UPowderWeatherManager::GetDefaultConfig(EWeatherPreset Preset)
 
 	return Config;
 }
+

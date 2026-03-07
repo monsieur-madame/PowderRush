@@ -2,6 +2,8 @@
 
 #include "Terrain/PowderAvalancheComponent.h"
 #include "Terrain/TerrainManager.h"
+#include "Terrain/PowderAvalancheActor.h"
+#include "Engine/World.h"
 
 UPowderAvalancheComponent::UPowderAvalancheComponent()
 {
@@ -49,6 +51,9 @@ void UPowderAvalancheComponent::TickComponent(float DeltaTime, ELevelTick TickTy
 	// Advance avalanche position
 	AvalancheDistance += CurrentSpeed * DeltaTime;
 	AvalancheDistance = FMath::Min(AvalancheDistance, CachedTerrainManager->GetCourseLength());
+
+	// Update visual position
+	UpdateVisualPosition();
 
 	// Catch check
 	float PlayerDist = CachedTerrainManager->GetPlayerDistance();
@@ -102,6 +107,7 @@ void UPowderAvalancheComponent::OnRunStateChanged(EPowderRunState NewState)
 	{
 	case EPowderRunState::Starting:
 		ResetAvalanche();
+		SpawnVisual();
 		bIsActive = false;
 		break;
 
@@ -111,9 +117,57 @@ void UPowderAvalancheComponent::OnRunStateChanged(EPowderRunState NewState)
 
 	case EPowderRunState::Paused:
 	case EPowderRunState::WipedOut:
+		bIsActive = false;
+		break;
+
 	case EPowderRunState::ScoreScreen:
 	case EPowderRunState::InMenu:
 		bIsActive = false;
+		DestroyVisual();
 		break;
 	}
+}
+
+void UPowderAvalancheComponent::SpawnVisual()
+{
+	if (AvalancheVisual)
+	{
+		return;
+	}
+
+	UWorld* World = GetWorld();
+	if (!World)
+	{
+		return;
+	}
+
+	FActorSpawnParameters SpawnParams;
+	SpawnParams.Owner = GetOwner();
+	SpawnParams.SpawnCollisionHandlingOverride = ESpawnActorCollisionHandlingMethod::AlwaysSpawn;
+	AvalancheVisual = World->SpawnActor<APowderAvalancheActor>(APowderAvalancheActor::StaticClass(), FVector::ZeroVector, FRotator::ZeroRotator, SpawnParams);
+
+	UpdateVisualPosition();
+}
+
+void UPowderAvalancheComponent::DestroyVisual()
+{
+	if (AvalancheVisual)
+	{
+		AvalancheVisual->Destroy();
+		AvalancheVisual = nullptr;
+	}
+}
+
+void UPowderAvalancheComponent::UpdateVisualPosition()
+{
+	if (!AvalancheVisual || !CachedTerrainManager)
+	{
+		return;
+	}
+
+	// Clamp to valid course range for position query
+	float ClampedDistance = FMath::Max(0.0f, AvalancheDistance);
+	FVector Pos = CachedTerrainManager->GetPositionAtDistance(ClampedDistance);
+	FVector Dir = CachedTerrainManager->GetDirectionAtDistance(ClampedDistance);
+	AvalancheVisual->UpdatePosition(Pos, Dir);
 }

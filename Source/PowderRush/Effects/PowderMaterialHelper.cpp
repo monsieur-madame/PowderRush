@@ -14,6 +14,7 @@ namespace PowderMaterialHelper
 	static TWeakObjectPtr<UMaterial> CachedMaterial;
 	static TWeakObjectPtr<UMaterial> CachedSnowMaterial;
 	static TWeakObjectPtr<UMaterial> CachedSkyMaterial;
+	static TWeakObjectPtr<UMaterial> CachedTranslucentMaterial;
 
 	UMaterial* GetColorMaterial()
 	{
@@ -126,6 +127,77 @@ namespace PowderMaterialHelper
 			MID->SetFlags(RF_Transient);
 			MID->SetVectorParameterValue(TEXT("SnowColor"), SnowColor);
 			MID->SetScalarParameterValue(TEXT("Roughness"), Roughness);
+		}
+		return MID;
+	}
+
+	UMaterial* GetTranslucentColorMaterial()
+	{
+		if (CachedTranslucentMaterial.IsValid())
+		{
+			return CachedTranslucentMaterial.Get();
+		}
+
+		UMaterial* Mat = LoadObject<UMaterial>(nullptr, TEXT("/Game/Materials/M_PowderTranslucent.M_PowderTranslucent"));
+		if (Mat)
+		{
+			CachedTranslucentMaterial = Mat;
+			return Mat;
+		}
+
+#if WITH_EDITOR
+		Mat = NewObject<UMaterial>(GetTransientPackage(), TEXT("M_PowderTranslucent_RT"));
+		Mat->BlendMode = BLEND_Translucent;
+		Mat->SetShadingModel(MSM_Unlit);
+		Mat->TwoSided = true;
+
+		auto* ColorParam = NewObject<UMaterialExpressionVectorParameter>(Mat);
+		ColorParam->ParameterName = TEXT("Color");
+		ColorParam->DefaultValue = FLinearColor(1.0f, 1.0f, 1.0f);
+
+		auto* OpacityParam = NewObject<UMaterialExpressionScalarParameter>(Mat);
+		OpacityParam->ParameterName = TEXT("Opacity");
+		OpacityParam->DefaultValue = 0.5f;
+
+		auto& Expressions = Mat->GetExpressionCollection().Expressions;
+		Expressions.Add(ColorParam);
+		Expressions.Add(OpacityParam);
+
+		auto* EditorData = Mat->GetEditorOnlyData();
+		EditorData->EmissiveColor.Expression = ColorParam;
+		EditorData->Opacity.Expression = OpacityParam;
+
+		Mat->PreEditChange(nullptr);
+		Mat->PostEditChange();
+
+		CachedTranslucentMaterial = Mat;
+		return Mat;
+#else
+		return GetColorMaterial();
+#endif
+	}
+
+	UMaterialInstanceDynamic* CreateTranslucentColorMID(UObject* Outer, FLinearColor Color, float Opacity)
+	{
+		UMaterial* BaseMat = GetTranslucentColorMaterial();
+		if (!BaseMat)
+		{
+			return nullptr;
+		}
+
+		if (Outer && Outer->HasAnyFlags(RF_ClassDefaultObject | RF_ArchetypeObject))
+		{
+			return nullptr;
+		}
+
+		UObject* SafeOuter = Outer ? Outer : GetTransientPackage();
+
+		UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(BaseMat, SafeOuter);
+		if (MID)
+		{
+			MID->SetFlags(RF_Transient);
+			MID->SetVectorParameterValue(TEXT("Color"), Color);
+			MID->SetScalarParameterValue(TEXT("Opacity"), Opacity);
 		}
 		return MID;
 	}

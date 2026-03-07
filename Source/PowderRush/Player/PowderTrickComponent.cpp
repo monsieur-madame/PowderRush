@@ -1,6 +1,7 @@
 #include "Player/PowderTrickComponent.h"
 #include "Player/PowderMovementComponent.h"
 #include "Components/MeshComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "Scoring/ScoreSubsystem.h"
 #include "Engine/GameInstance.h"
 
@@ -69,6 +70,56 @@ void UPowderTrickComponent::BeginPlay()
 	CachedMovement = GetOwner()->FindComponentByClass<UPowderMovementComponent>();
 	CachedBodyMesh = GetOwner()->FindComponentByClass<UMeshComponent>();
 
+	// Derive TrickPivotHeight from the pelvis bone position in the skeleton
+	if (USkeletalMeshComponent* SkelMesh = Cast<USkeletalMeshComponent>(CachedBodyMesh.Get()))
+	{
+		// Try the configured bone name, then common alternatives
+		static const FName BoneNameCandidates[] = {
+			FName(TEXT("pelvis")),
+			FName(TEXT("Pelvis")),
+			FName(TEXT("Hips")),
+			FName(TEXT("hips")),
+			FName(TEXT("spine_01")),
+		};
+
+		bool bFoundBone = false;
+
+		// Try configured name first
+		if (SkelMesh->GetBoneIndex(PivotBoneName) != INDEX_NONE)
+		{
+			FVector BonePos = SkelMesh->GetBoneLocation(PivotBoneName, EBoneSpaces::ComponentSpace);
+			TrickPivotHeight = BonePos.Z;
+			bFoundBone = true;
+			UE_LOG(LogTemp, Display, TEXT("PowderTrickComponent: Pivot height %.1f from bone '%s'"),
+				TrickPivotHeight, *PivotBoneName.ToString());
+		}
+
+		// Fallback to common bone name candidates
+		if (!bFoundBone)
+		{
+			for (const FName& Candidate : BoneNameCandidates)
+			{
+				if (SkelMesh->GetBoneIndex(Candidate) != INDEX_NONE)
+				{
+					FVector BonePos = SkelMesh->GetBoneLocation(Candidate, EBoneSpaces::ComponentSpace);
+					TrickPivotHeight = BonePos.Z;
+					PivotBoneName = Candidate;
+					bFoundBone = true;
+					UE_LOG(LogTemp, Display, TEXT("PowderTrickComponent: Pivot height %.1f from fallback bone '%s'"),
+						TrickPivotHeight, *Candidate.ToString());
+					break;
+				}
+			}
+		}
+
+		if (!bFoundBone)
+		{
+			UE_LOG(LogTemp, Warning,
+				TEXT("PowderTrickComponent: No pelvis/hips bone found in skeleton. Using default TrickPivotHeight=%.1f"),
+				TrickPivotHeight);
+		}
+	}
+
 	// Bind to movement delegates
 	if (CachedMovement)
 	{
@@ -85,6 +136,9 @@ void UPowderTrickComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 	{
 		return;
 	}
+
+	// Undo previous frame's pivot offset before movement has a chance to compound it
+	UndoPivotOffset();
 
 	TrickTimer += DeltaTime;
 
@@ -106,7 +160,20 @@ void UPowderTrickComponent::TickComponent(float DeltaTime, ELevelTick TickType, 
 		FQuat HeadingQuat = FRotator(0.0f, CachedMovement->GetDesiredYaw(), 0.0f).Quaternion();
 		FQuat TrickQuat = CurrentTrickRot.Quaternion();
 		FQuat MeshOffsetQuat = FRotator(0.0f, CachedMovement->VisualYawOffset, 0.0f).Quaternion();
-		CachedBodyMesh->SetWorldRotation((HeadingQuat * TrickQuat * MeshOffsetQuat).Rotator());
+		FQuat FullQuat = HeadingQuat * TrickQuat * MeshOffsetQuat;
+
+		// --- Center-of-mass pivot offset ---
+		// Rotate around a point TrickPivotHeight above the mesh origin (feet)
+		// instead of around the feet themselves.
+		// Math: offset = CenterOffset + FullQuat.RotateVector(-CenterOffset)
+		// This is zero when no trick rotation is applied (identity trick quat).
+		FVector CenterOffset(0.0f, 0.0f, TrickPivotHeight);
+		FQuat PivotQuat = HeadingQuat * TrickQuat;  // Pivot uses trick rotation in heading frame (without mesh offset)
+		FVector RotatedFoot = PivotQuat.RotateVector(-CenterOffset);
+		TrickVisualOffset = CenterOffset + RotatedFoot;
+
+		FVector MeshPos = CachedBodyMesh->GetComponentLocation();
+		CachedBodyMesh->SetWorldLocationAndRotation(MeshPos + TrickVisualOffset, FullQuat.Rotator());
 	}
 
 	// Check completion
@@ -186,12 +253,6 @@ void UPowderTrickComponent::FailTrick()
 
 	// Reset body mesh rotation to movement-driven heading
 	RestoreBaseRotation();
-
-	// Trigger wipeout on movement component
-	if (CachedMovement)
-	{
-		CachedMovement->TriggerWipeout();
-	}
 }
 
 void UPowderTrickComponent::OnBecameAirborne()
@@ -262,12 +323,23 @@ void UPowderTrickComponent::ResetJumpState()
 
 void UPowderTrickComponent::RestoreBaseRotation()
 {
+	UndoPivotOffset();
+
 	if (CachedBodyMesh && CachedMovement)
 	{
 		// Compose heading + mesh offset (no tilt — consistent with trick frame)
 		FQuat HeadingQuat = FRotator(0.0f, CachedMovement->GetDesiredYaw(), 0.0f).Quaternion();
 		FQuat MeshOffsetQuat = FRotator(0.0f, CachedMovement->VisualYawOffset, 0.0f).Quaternion();
 		CachedBodyMesh->SetWorldRotation((HeadingQuat * MeshOffsetQuat).Rotator());
+	}
+}
+
+void UPowderTrickComponent::UndoPivotOffset()
+{
+	if (CachedBodyMesh && !TrickVisualOffset.IsNearlyZero())
+	{
+		CachedBodyMesh->SetWorldLocation(CachedBodyMesh->GetComponentLocation() - TrickVisualOffset);
+		TrickVisualOffset = FVector::ZeroVector;
 	}
 }
 

@@ -10,11 +10,9 @@ class UExponentialHeightFogComponent;
 class USkyLightComponent;
 class UStaticMeshComponent;
 class UMaterialInstanceDynamic;
-class UNiagaraComponent;
-
 /**
- * Manages weather transitions: smoothly lerps lighting, fog, sky,
- * and controls ambient snowfall particle rate.
+ * Manages weather transitions: smoothly lerps lighting, fog, and sky.
+ * Snowfall particles are owned per-volume by APowderWeatherVolume.
  * Attach to APowderEnvironmentSetup after it spawns the lighting/fog/sky.
  */
 UCLASS(ClassGroup=(PowderRush), meta=(BlueprintSpawnableComponent))
@@ -77,8 +75,4 @@ private:
 
 	UPROPERTY()
 	TObjectPtr<UMaterialInstanceDynamic> CachedSkyDomeMID;
-
-	// Ambient snowfall Niagara component (spawned if SnowfallRate > 0)
-	UPROPERTY()
-	TObjectPtr<UNiagaraComponent> SnowfallComponent;
 };

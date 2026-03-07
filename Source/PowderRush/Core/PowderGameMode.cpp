@@ -122,9 +122,10 @@ void APowderGameMode::StartRun()
 		}
 	}
 
-	// Force clear day at start, then volume blending takes over during Tick.
+	// Start with overcast weather so snowfall particles are visible.
+	// Volume blending takes over during Tick if weather volumes are placed.
 	bHasLastAppliedWeather = false;
-	ApplyWeatherIfNeeded(UPowderWeatherManager::GetDefaultConfig(EWeatherPreset::ClearDay));
+	ApplyWeatherIfNeeded(UPowderWeatherManager::GetDefaultConfig(EWeatherPreset::Overcast));
 
 	SetPlayerFrozen(false);
 	SetRunState(EPowderRunState::Running);
